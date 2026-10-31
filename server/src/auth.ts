@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type Database from "better-sqlite3";
 import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
+import { logAuthEvent } from "./audit.js";
 
 const scryptAsync = promisify(scrypt) as (pw: string, salt: Buffer, len: number, opts: object) => Promise<Buffer>;
 
@@ -159,9 +160,11 @@ export function authPlugin(db: Database.Database, limiter = new LoginLimiter()) 
         if (!stored) return reply.code(409).send({ error: "no password set on the server yet" });
         if (!(await verifyPassword(req.body.password, stored))) {
           limiter.fail(req.ip);
+          logAuthEvent(db, "login_failed", req);
           return reply.code(401).send({ error: "wrong password" });
         }
         limiter.succeed(req.ip);
+        logAuthEvent(db, "login", req);
         db.prepare("DELETE FROM sessions WHERE expires_at <= datetime('now')").run();
         setSessionCookie(req, reply, createSession(db, req.headers["user-agent"]));
         return { authenticated: true };
@@ -171,6 +174,15 @@ export function authPlugin(db: Database.Database, limiter = new LoginLimiter()) 
     app.post("/api/auth/logout", async (req, reply) => {
       const token = req.cookies[SESSION_COOKIE];
       if (token) db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(sha256(token));
+      logAuthEvent(db, "logout", req);
+      reply.clearCookie(SESSION_COOKIE, { path: "/" });
+      return { authenticated: false };
+    });
+
+    // For a lost phone: ends every session, including this one.
+    app.post("/api/auth/logout-all", async (req, reply) => {
+      db.prepare("DELETE FROM sessions").run();
+      logAuthEvent(db, "signed_out_everywhere", req);
       reply.clearCookie(SESSION_COOKIE, { path: "/" });
       return { authenticated: false };
     });
@@ -195,6 +207,7 @@ export function authPlugin(db: Database.Database, limiter = new LoginLimiter()) 
           return reply.code(400).send({ error: "current password is wrong" });
         }
         await setPassword(db, req.body.next); // also ends all sessions
+        logAuthEvent(db, "password_changed", req);
         setSessionCookie(req, reply, createSession(db, req.headers["user-agent"]));
         return { ok: true };
       },

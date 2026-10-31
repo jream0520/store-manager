@@ -97,18 +97,20 @@ M1 is deliberately early: iOS PWA and camera behavior is the largest risk, so it
 - ✅ Aging: dashboard alerts link to the In shop list, which already sorts longest-in-shop first (F25).
 - ✅ CSV export of items, sales and expenses (spreadsheet-safe: amounts as decimals, formula injection neutralized, UTF-8 BOM) (F26).
 - Decision: profit everywhere = sold price − materials cost. A sale with no cost yet counts as zero cost and is flagged ("may be high") rather than left out. Net = profit − expenses.
-- ⬜ Verify on iPhone after deploy (including CSV download from the Home Screen app).
+- ✅ Verified on iPhone after deploy (2026-10-31).
 
 **Done when:** report numbers match a hand calculation on a test dataset.
 
 ## M7 — Hardening and operations
 **Goal:** Safe to trust with real data.
-- Backup: scheduled snapshot or a built-in full export of the DB and photos (F29); a tested restore procedure and a restore-drill test.
-- Audit log (F30).
-- Security review: headers, cookie flags, rate limits, dependency audit, optional network restriction guide.
-- Setup and operations docs: install, reverse-proxy setup, upgrade, backup, restore.
-- Real-device regression pass on iPhone and iPad; performance check with a large dataset.
-- Tag v1.0.
+- ✅ Automatic backups (default daily, keep 14): online SQLite snapshot with integrity check, hard-linked photos, manifest with checksum. "Back up now" and "Download" (.tar.gz) in Settings; `backup` / `list-backups` / `restore` CLI. Restore sets current data aside and verifies checksum, integrity and photo count (F29).
+- ✅ Restore drill: automated tests, plus an end-to-end drill in Docker (2,000 items, 1,200 photo files, 800 sales): download, destroy container and volume, restore onto a fresh install; all figures matched.
+- ✅ Audit log via database triggers on every main table, plus sign-in events; Activity log page with filters (F30).
+- ✅ Security: CSP and related headers; sign out everywhere; container runs read-only with no capabilities and no-new-privileges; dependency audit reviewed (see OPERATIONS.md).
+- ✅ Performance with 2,000 items: every API call under 10 ms on the dev machine except the 2-year profit report (31 ms). Expect a few times slower on the server, still well under a second.
+- ✅ Setup and operations docs: docs/OPERATIONS.md.
+- ⬜ Real-device regression pass on iPhone (and iPad) after deploy.
+- ⬜ Tag v1.0.
 
 **Done when:** a fresh host can be restored from a backup into an identical working state, and you are running real inventory on it.
 

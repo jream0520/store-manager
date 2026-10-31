@@ -6,9 +6,24 @@ services:
         BASE_PATH: ${BASE_PATH:-/}
     image: store-manager:latest
     restart: unless-stopped
+    environment:
+      # Automatic backups (see docs/OPERATIONS.md). BACKUP_DIR defaults to /data/backups.
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+      BACKUP_KEEP: ${BACKUP_KEEP:-14}
+      BACKUP_DIR: ${BACKUP_DIR_IN_CONTAINER:-}
     volumes:
       - ./data:/data
+      # To keep backups on another disk, mount it and set BACKUP_DIR_IN_CONTAINER=/backups:
+      # - /mnt/otherdisk/store-manager-backups:/backups
     # Plain HTTP; the host's TLS reverse proxy forwards to it. APP_BIND defaults to
     # loopback; set it to the host's LAN IP if the proxy reaches services that way.
     ports:
       - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
+    # Hardening: the app only writes to /data (and /tmp).
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

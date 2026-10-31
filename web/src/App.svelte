@@ -4,6 +4,7 @@
   import { href, match, route, startRouter } from "./lib/router.svelte";
   import { session } from "./lib/session.svelte";
   import type { Settings } from "./lib/types";
+  import Activity from "./pages/Activity.svelte";
   import Analysis from "./pages/Analysis.svelte";
   import Expenses from "./pages/Expenses.svelte";
   import ItemEditor from "./pages/ItemEditor.svelte";
@@ -41,7 +42,7 @@
   const itemParams = $derived(match("/items/:id"));
   const reportParams = $derived(match("/reports/:id"));
   const tab = $derived(
-    route.path === "/settings" ? "settings" : route.path === "/items/new" ? "new" : route.path === "/shop" ? "shop" : ["/sales", "/expenses", "/analysis"].includes(route.path) || route.path.startsWith("/reports/") ? "sales" : "items",
+    route.path === "/settings" || route.path === "/activity" ? "settings" : route.path === "/items/new" ? "new" : route.path === "/shop" ? "shop" : ["/sales", "/expenses", "/analysis"].includes(route.path) || route.path.startsWith("/reports/") ? "sales" : "items",
   );
 </script>
 
@@ -75,6 +76,8 @@
         <Analysis />
       {:else if reportParams && /^\d+$/.test(reportParams.id)}
         <Reconcile id={Number(reportParams.id)} />
+      {:else if route.path === "/activity"}
+        <Activity />
       {:else if route.path === "/settings"}
         <SettingsPage />
       {:else}

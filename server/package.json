@@ -15,11 +15,13 @@
     "@fastify/multipart": "^10.1.6",
     "@fastify/static": "^10.1.8",
     "better-sqlite3": "^13.0.3",
-    "fastify": "^5.12.7"
+    "fastify": "^5.12.7",
+    "tar-stream": "^3.2.2"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.6.6",
+    "@types/tar-stream": "^3.1.5",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"

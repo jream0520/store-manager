@@ -1,6 +1,8 @@
 # Store Manager
 
-Self-hosted inventory and sales tracker for a booth in a boutique shop. See [PRD.md](PRD.md) and [MILESTONES.md](MILESTONES.md); stack rationale in [docs/decisions/0001-stack.md](docs/decisions/0001-stack.md).
+Self-hosted inventory and sales tracker for a booth in a boutique shop: items with photos and tag numbers, what's in the shop, sales reconciled against the shop's reports, expenses and profit. Runs as one Docker container; used from an iPhone as a Home Screen web app.
+
+See [PRD.md](PRD.md), [MILESTONES.md](MILESTONES.md), [docs/OPERATIONS.md](docs/OPERATIONS.md), and the stack rationale in [docs/decisions/0001-stack.md](docs/decisions/0001-stack.md).
 
 ## Develop
 ```bash
@@ -10,41 +12,16 @@ npm run dev:web      # Vite on :5173, proxies /api
 npm test
 ```
 
-## Deploy
+## Deploy and operate
 
-The image is **built on the dev machine and loaded on the server**. The server never builds it: the front-end build tools need AVX, which the server's CPU (Pentium G2020T) lacks. The app itself runs fine there.
+See **[docs/OPERATIONS.md](docs/OPERATIONS.md)** for install, configuration, updates with `deploy.ps1`, backups and restore, passwords, security notes and troubleshooting.
 
-The container serves plain HTTP. The host's existing reverse proxy terminates HTTPS, which iOS requires for the camera and Home Screen install.
-
-### Configuration (`.env`, see `.env.example`)
-
-| Variable | Read on | Purpose |
-|---|---|---|
-| `BASE_PATH` | dev machine (build) | URL prefix the proxy serves the app under, e.g. `/store/`. Use `/` for a dedicated hostname. Baked into the web build. |
-| `APP_BIND` | server | Address the container is published on. `127.0.0.1` for a proxy on the host; the LAN IP if the proxy reaches services that way. |
-| `APP_PORT` | server | Host port the proxy forwards to. |
-
-### First-time server setup
+Quick reference (server, in `~/store-manager`):
 ```bash
-mkdir -p ~/store-manager/data && sudo chown 1000:1000 ~/store-manager/data   # container runs as uid 1000
-cd ~/store-manager && cp .env.example .env    # then set APP_BIND / APP_PORT
+docker compose exec app node server/dist/cli.js set-password
+docker compose exec app node server/dist/cli.js backup
+docker compose exec app node server/dist/cli.js list-backups
 ```
-
-### Each deploy (from the dev machine, PowerShell)
-```bash
-.\deploy.ps1 -Server <DEPLOY_TARGET>
-```
-This builds the image, writes it to a file, copies it and `docker-compose.yml` to the server, then loads it, restarts the container, and runs a health check. Don't pipe `docker save` through PowerShell, which corrupts the tar.
-
-Then open `https://<your-hostname><BASE_PATH>` on the phone and choose Share → Add to Home Screen. All data lives in `./data` on the server: `store.db` plus `photos/`. Back up the whole folder.
-
-### Set or reset the password
-
-There's one owner login. Set it the first time (and any time you forget it) on the server:
-```bash
-cd ~/store-manager && docker compose exec app node server/dist/cli.js set-password
-```
-Setting it signs out every device. To change it while signed in, use Settings → Password. After 5 wrong attempts from one address (or 20 overall), login is blocked for 15 minutes.
 
 ### Reverse proxy examples
 

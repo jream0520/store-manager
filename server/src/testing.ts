@@ -14,7 +14,16 @@ export const CSRF = { "x-requested-with": "store-manager" };
 export function newApp(opts: AppOptions = {}) {
   const db = openDb(":memory:", migrations);
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "sm-test-"));
-  const app = buildApp({ port: 0, host: "127.0.0.1", dataDir, webDir: "/nonexistent" }, db, opts);
+  const config = {
+    port: 0,
+    host: "127.0.0.1",
+    dataDir,
+    webDir: "/nonexistent",
+    backupDir: path.join(dataDir, "backups"),
+    backupIntervalHours: 24,
+    backupKeep: 3,
+  };
+  const app = buildApp(config, db, opts);
   return { app, db, dataDir };
 }
 

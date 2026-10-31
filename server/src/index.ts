@@ -7,7 +7,7 @@ import { openDb } from "./db.js";
 const config = loadConfig();
 const migrationsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../migrations");
 const db = openDb(path.join(config.dataDir, "store.db"), migrationsDir);
-const app = buildApp(config, db);
+const app = buildApp(config, db, { startBackups: true });
 
 app.listen({ port: config.port, host: config.host }).catch((err) => {
   app.log.error(err);

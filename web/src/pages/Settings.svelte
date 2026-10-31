@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import BackupPanel from "../components/BackupPanel.svelte";
   import { del, get, patch, post } from "../lib/api";
+  import { href } from "../lib/router.svelte";
   import { session } from "../lib/session.svelte";
   import type { Category, Settings } from "../lib/types";
 
@@ -94,6 +96,13 @@
     await post("/auth/logout").catch(() => {});
     session.authenticated = false;
   }
+
+  // For a lost or shared device: ends every session, this one included.
+  async function signOutEverywhere() {
+    if (!confirm("Sign out on every device, including this one?")) return;
+    await post("/auth/logout-all").catch(() => {});
+    session.authenticated = false;
+  }
 </script>
 
 <h1>Settings</h1>
@@ -135,6 +144,11 @@
 </section>
 
 <section>
+  <h2>Backups</h2>
+  <BackupPanel />
+</section>
+
+<section>
   <h2>Password</h2>
   <form onsubmit={changePassword}>
     <input type="text" autocomplete="username" value="owner" hidden readonly />
@@ -151,7 +165,12 @@
 </section>
 
 <section>
-  <button class="danger signout" onclick={signOut}>Sign out</button>
+  <h2>Security</h2>
+  <p><a href={href("/activity")}>Activity log</a> <span class="muted">· every change and sign-in</span></p>
+  <div class="row">
+    <button class="grow" onclick={signOutEverywhere}>Sign out everywhere</button>
+    <button class="danger grow" onclick={signOut}>Sign out</button>
+  </div>
 </section>
 
 <style>
@@ -173,8 +192,5 @@
   }
   .actions {
     margin-top: 16px;
-  }
-  .signout {
-    width: 100%;
   }
 </style>

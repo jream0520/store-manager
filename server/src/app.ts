@@ -1,22 +1,40 @@
 import Fastify from "fastify";
+import fastifyCookie from "@fastify/cookie";
 import fastifyStatic from "@fastify/static";
 import fs from "node:fs";
-import path from "node:path";
 import type Database from "better-sqlite3";
+import { authPlugin, LoginLimiter } from "./auth.js";
+import { categoryRoutes } from "./categories.js";
 import type { Config } from "./config.js";
-import { spikePhotoRoutes } from "./spikePhotos.js";
+import { itemRoutes } from "./items.js";
+import { settingsRoutes } from "./settings.js";
 
-export function buildApp(config: Config, db: Database.Database) {
+export interface AppOptions {
+  limiter?: LoginLimiter;
+}
+
+export function buildApp(config: Config, db: Database.Database, opts: AppOptions = {}) {
   // Runs behind the host's TLS reverse proxy; trust its X-Forwarded-* headers.
-  const app = Fastify({ logger: process.env.NODE_ENV !== "test", trustProxy: true });
-
-  app.get("/api/health", async () => {
-    const row = db.prepare("SELECT COUNT(*) AS n FROM schema_migrations").get() as { n: number };
-    return { status: "ok", migrations: row.n };
+  const app = Fastify({
+    logger: process.env.NODE_ENV !== "test",
+    trustProxy: true,
+    // Reject unknown body fields instead of silently stripping them.
+    ajv: { customOptions: { removeAdditional: false } },
   });
 
-  app.register(spikePhotoRoutes(path.join(config.dataDir, "spike-photos"), config.spikeUploadKey), {
-    prefix: "/api/spike/photos",
+  app.register(fastifyCookie);
+  app.register(async (api) => {
+    // Called directly (not registered) so its guard hook covers every route in this scope.
+    await authPlugin(db, opts.limiter)(api);
+
+    api.get("/api/health", async () => {
+      const row = db.prepare("SELECT COUNT(*) AS n FROM schema_migrations").get() as { n: number };
+      return { status: "ok", migrations: row.n };
+    });
+
+    await api.register(settingsRoutes(db));
+    await api.register(categoryRoutes(db));
+    await api.register(itemRoutes(db));
   });
 
   if (fs.existsSync(config.webDir)) {

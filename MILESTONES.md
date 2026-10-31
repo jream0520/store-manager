@@ -34,20 +34,23 @@ M1 is deliberately early: iOS PWA and camera behavior is the largest risk, so it
 ## M1 — Device and deploy spike
 **Goal:** Retire the iOS risk.
 - ✅ Minimal PWA: manifest, PNG icons (incl. apple-touch-icon), service worker for app shell only.
-- ⬜ Add to Home Screen on iPhone and iPad; full-screen launch. *(needs device test)*
-- ✅ Camera capture (`<input capture>`) plus library picker; client-side resize to 2000 px JPEG with EXIF orientation applied; upload behind a temporary key; display it back. Verified on desktop with an EXIF-rotated fixture. ⬜ iPhone camera and HEIC *(needs device test)*.
-- ⬜ Verify behavior after the app is backgrounded and relaunched (launch counter on the page). *(needs device test)*
+- ✅ Add to Home Screen on iPhone; launches standalone (verified on device 2026-10-31). iPad not yet tried.
+- ✅ Camera capture (`<input capture>`) plus library picker; client-side resize to 2000 px JPEG with EXIF orientation applied; upload behind a temporary key; display it back. Verified on iPhone and with an EXIF-rotated fixture.
+- ✅ Storage survives background/relaunch (launch counter, verified on device).
+- ⬜ Service worker status on device not yet reported.
 
 **Done when:** a photo taken on the iPhone appears on the server volume and in the app, from the installed Home Screen app.
 
 ## M2 — Auth and item core
 **Goal:** A usable catalog without photos.
-- Single-user setup (first-run password creation or env-seeded), login, long-lived secure session, login rate limiting (F27).
-- Settings: shop name, categories, currency (F28).
-- Item schema and migrations; short sequential item numbers that are never reused, with lookup that ignores leading zeros (F2).
-- Create/edit/archive item (F1); list with search, filters, sort (F4).
-- Quick-add path with the "incomplete" flag (F7).
-- App shell: navigation, mobile-first layout, light/dark mode.
+- ✅ Single-user password set via CLI in the container (no web first-run, since the site is public), scrypt hashing, 90-day sliding sessions in an httpOnly cookie, CSRF header guard, login rate limiting (F27). Password change in Settings.
+- ✅ Settings: shop name, categories, currency (F28).
+- ✅ Item schema and migrations; item number = never-reused id; search by "42", "0042" or "#42" (F2).
+- ✅ Create/edit/archive item (F1); list with search, filters, sort, filters kept in the URL (F4).
+- ✅ Quick-add path; items missing price, cost or category are flagged incomplete (F7).
+- ✅ App shell: bottom tab bar, mobile-first layout, light/dark mode.
+- ✅ M1 photo spike endpoints and page removed; the resize code is kept for M3.
+- ⬜ Verify on iPhone after deploy.
 
 **Done when:** you can sign in from your phone and add, find, and edit items. Unit and API tests cover the item lifecycle.
 

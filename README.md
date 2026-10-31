@@ -23,7 +23,6 @@ The container serves plain HTTP. The host's existing reverse proxy terminates HT
 | `BASE_PATH` | dev machine (build) | URL prefix the proxy serves the app under, e.g. `/store/`. Use `/` for a dedicated hostname. Baked into the web build. |
 | `APP_BIND` | server | Address the container is published on. `127.0.0.1` for a proxy on the host; the LAN IP if the proxy reaches services that way. |
 | `APP_PORT` | server | Host port the proxy forwards to. |
-| `SPIKE_UPLOAD_KEY` | server | Temporary (M1): enables the photo-upload test. Unset to disable. |
 
 ### First-time server setup
 ```bash
@@ -39,14 +38,13 @@ This builds the image, writes it to a file, copies it and `docker-compose.yml` t
 
 Then open `https://<your-hostname><BASE_PATH>` on the phone and choose Share → Add to Home Screen. All data lives in `./data` on the server (back it up).
 
-### M1 device check (temporary)
+### Set or reset the password
 
-The home page is a device test: server status, Home Screen launch, service worker, storage, and camera → resize → upload → display. Uploads need a shared key because there's no login until M2.
-
-1. On the server, set `SPIKE_UPLOAD_KEY` in `.env` to a long random value (`openssl rand -hex 16`), then run `docker compose up -d --no-build`.
-2. On the iPhone in Safari, open the app, enter the key, then take a photo and pick one from the library. Check that they appear upright and that the sizes look sensible.
-3. Choose Share → Add to Home Screen, then launch from the icon. "Launched from Home Screen" should say yes, and the service worker should be active. Background the app, reopen it, and check that the launch count increases.
-4. When done, clear `SPIKE_UPLOAD_KEY` (this disables the endpoints) and delete `data/spike-photos/`.
+There's one owner login. Set it the first time (and any time you forget it) on the server:
+```bash
+cd ~/store-manager && docker compose exec app node server/dist/cli.js set-password
+```
+Setting it signs out every device. To change it while signed in, use Settings → Password. After 5 wrong attempts from one address (or 20 overall), login is blocked for 15 minutes.
 
 ### Reverse proxy examples
 

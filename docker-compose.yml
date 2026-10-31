@@ -6,9 +6,6 @@ services:
         BASE_PATH: ${BASE_PATH:-/}
     image: store-manager:latest
     restart: unless-stopped
-    environment:
-      # M1 photo spike only; leave unset to disable the test upload endpoints.
-      SPIKE_UPLOAD_KEY: ${SPIKE_UPLOAD_KEY:-}
     volumes:
       - ./data:/data
     # Plain HTTP; the host's TLS reverse proxy forwards to it. APP_BIND defaults to

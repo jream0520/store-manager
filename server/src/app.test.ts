@@ -12,6 +12,6 @@ describe("health", () => {
     const app = buildApp({ port: 0, host: "127.0.0.1", dataDir: "", webDir: "/nonexistent" }, db);
     const res = await app.inject("/api/health");
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ status: "ok", migrations: 1 });
+    expect(res.json()).toEqual({ status: "ok", migrations: 2 });
   });
 });

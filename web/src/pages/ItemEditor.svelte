@@ -1,0 +1,249 @@
+<script lang="ts">
+  import { onMount } from "svelte";
+  import { get, patch, post } from "../lib/api";
+  import { centsToInput, formatMoney, parseMoney } from "../lib/money";
+  import { href, navigate } from "../lib/router.svelte";
+  import { session } from "../lib/session.svelte";
+  import { itemNumber, STATUS_LABELS, type Category, type Item } from "../lib/types";
+
+  let { id }: { id?: number } = $props();
+
+  let item = $state<Item | null>(null);
+  let categories = $state<Category[]>([]);
+  let loading = $state(true);
+  let notFound = $state(false);
+
+  let name = $state("");
+  let price = $state("");
+  let cost = $state("");
+  let categoryId = $state("");
+  let tags = $state("");
+  let description = $state("");
+  let notes = $state("");
+
+  let busy = $state(false);
+  let error = $state("");
+  let saved = $state(false);
+  let tried = $state(false);
+
+  const priceCents = $derived(parseMoney(price));
+  const costCents = $derived(parseMoney(cost));
+  const nameOk = $derived(name.trim().length > 0);
+  const valid = $derived(nameOk && priceCents !== undefined && costCents !== undefined);
+  const profit = $derived(
+    typeof priceCents === "number" && typeof costCents === "number" ? priceCents - costCents : null,
+  );
+  const currency = $derived(session.settings.currency);
+
+  onMount(async () => {
+    try {
+      const [cats, existing] = await Promise.all([
+        get<Category[]>("/categories"),
+        id ? get<Item>(`/items/${id}`) : Promise.resolve(null),
+      ]);
+      categories = cats;
+      if (existing) fill(existing);
+      else if (id) notFound = true;
+    } catch (e) {
+      if ((e as { status?: number }).status === 404) notFound = true;
+      else error = (e as Error).message;
+    } finally {
+      loading = false;
+    }
+  });
+
+  function fill(it: Item) {
+    item = it;
+    name = it.name;
+    price = centsToInput(it.priceCents);
+    cost = centsToInput(it.costCents);
+    categoryId = it.categoryId ? String(it.categoryId) : "";
+    tags = it.tags.join(", ");
+    description = it.description;
+    notes = it.notes;
+  }
+
+  async function onCategoryChange() {
+    if (categoryId !== "__new") return;
+    const n = prompt("New category name")?.trim();
+    if (!n) {
+      categoryId = item?.categoryId ? String(item.categoryId) : "";
+      return;
+    }
+    try {
+      const existing = categories.find((c) => c.name.toLowerCase() === n.toLowerCase());
+      const c = existing ?? (await post<Category>("/categories", { name: n }));
+      if (!existing) categories = [...categories, c].sort((a, b) => a.name.localeCompare(b.name));
+      categoryId = String(c.id);
+    } catch (e) {
+      error = (e as Error).message;
+      categoryId = "";
+    }
+  }
+
+  async function save(e: SubmitEvent) {
+    e.preventDefault();
+    tried = true;
+    if (!valid) return;
+    busy = true;
+    error = "";
+    const body = {
+      name: name.trim(),
+      priceCents,
+      costCents,
+      categoryId: categoryId ? Number(categoryId) : null,
+      tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+      description,
+      notes,
+    };
+    try {
+      if (item) {
+        fill(await patch<Item>(`/items/${item.id}`, body));
+        flashSaved();
+      } else {
+        const created = await post<Item>("/items", body);
+        navigate(`/items/${created.id}?created=1`, { replace: true });
+      }
+    } catch (err) {
+      error = (err as Error).message;
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function setArchived(archived: boolean) {
+    if (!item) return;
+    if (archived && !confirm(`Archive “${item.name}”? It will be hidden from the list but not deleted.`)) return;
+    try {
+      fill(await patch<Item>(`/items/${item.id}`, { archived }));
+    } catch (err) {
+      error = (err as Error).message;
+    }
+  }
+
+  let savedTimer: ReturnType<typeof setTimeout>;
+  function flashSaved() {
+    saved = true;
+    clearTimeout(savedTimer);
+    savedTimer = setTimeout(() => (saved = false), 2000);
+  }
+
+  const justCreated = new URLSearchParams(location.search).get("created") === "1";
+</script>
+
+<p><a href={href("/")} onclick={(e) => { if (history.length > 1 && !justCreated) { e.preventDefault(); history.back(); } }}>‹ Items</a></p>
+
+{#if loading}
+  <p class="muted">Loading…</p>
+{:else if notFound}
+  <h1>Item not found</h1>
+  <p>There's no item with that number.</p>
+{:else}
+  {#if item}
+    <div class="numhead">
+      <span class="tag" aria-label="Tag number">{itemNumber(item.number)}</span>
+      <span class="badge">{STATUS_LABELS[item.status]}</span>
+      {#if item.incomplete}<span class="badge warn">Incomplete</span>{/if}
+      {#if item.archived}<span class="badge">Archived</span>{/if}
+    </div>
+    {#if justCreated}<p class="created card">Saved. Write <strong>{itemNumber(item.number)}</strong> on the price tag.</p>{/if}
+  {:else}
+    <h1>New item</h1>
+  {/if}
+
+  <form onsubmit={save} novalidate>
+    <label for="name">Name</label>
+    <input id="name" bind:value={name} maxlength="120" aria-invalid={tried && !nameOk} autocomplete="off" />
+    {#if tried && !nameOk}<p class="error">Name is required.</p>{/if}
+
+    <div class="two">
+      <div>
+        <label for="price">Price</label>
+        <input id="price" bind:value={price} inputmode="decimal" placeholder="0.00" aria-invalid={priceCents === undefined} autocomplete="off" />
+      </div>
+      <div>
+        <label for="cost">Materials cost</label>
+        <input id="cost" bind:value={cost} inputmode="decimal" placeholder="0.00" aria-invalid={costCents === undefined} autocomplete="off" />
+      </div>
+    </div>
+    {#if priceCents === undefined || costCents === undefined}
+      <p class="error">Enter amounts like 12 or 12.50.</p>
+    {:else if profit !== null}
+      <p class="muted profit">Profit if sold at this price: {formatMoney(profit, currency)}</p>
+    {/if}
+
+    <label for="cat">Category</label>
+    <select id="cat" bind:value={categoryId} onchange={onCategoryChange}>
+      <option value="">Uncategorized</option>
+      {#each categories as c}<option value={String(c.id)}>{c.name}</option>{/each}
+      <option value="__new">+ New category…</option>
+    </select>
+
+    <label for="tags">Tags <span class="hint">(comma separated)</span></label>
+    <input id="tags" bind:value={tags} placeholder="silk, blue, hand-dyed" autocomplete="off" autocapitalize="none" />
+
+    <label for="desc">Description</label>
+    <textarea id="desc" bind:value={description} maxlength="4000"></textarea>
+
+    <label for="notes">Private notes</label>
+    <textarea id="notes" bind:value={notes} maxlength="4000"></textarea>
+
+    {#if error}<p class="error" role="alert">{error}</p>{/if}
+
+    <div class="actions row">
+      <button class="primary grow" type="submit" disabled={busy}>
+        {busy ? "Saving…" : saved ? "Saved ✓" : item ? "Save changes" : "Create item"}
+      </button>
+    </div>
+  </form>
+
+  {#if item}
+    <div class="archive">
+      {#if item.archived}
+        <button onclick={() => setArchived(false)}>Restore from archive</button>
+      {:else}
+        <button class="danger" onclick={() => setArchived(true)}>Archive item</button>
+      {/if}
+    </div>
+  {/if}
+{/if}
+
+<style>
+  .numhead {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 8px 0 4px;
+  }
+  .tag {
+    font-size: 32px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+    margin-right: 4px;
+  }
+  .created {
+    margin: 8px 0;
+  }
+  .two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .profit {
+    font-size: 14px;
+    margin: 6px 0 0;
+  }
+  .hint {
+    font-size: 12px;
+  }
+  .actions {
+    margin-top: 20px;
+    position: sticky;
+    bottom: calc(68px + env(safe-area-inset-bottom));
+  }
+  .archive {
+    margin: 32px 0 16px;
+  }
+</style>

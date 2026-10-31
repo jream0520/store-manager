@@ -4,12 +4,26 @@ import path from "node:path";
 
 /** Opens the SQLite database and applies any pending migrations in order. */
 export function openDb(file: string, migrationsDir: string): Database.Database {
-  if (file !== ":memory:") fs.mkdirSync(path.dirname(file), { recursive: true });
+  if (file !== ":memory:") ensureWritableDir(path.dirname(file));
   const db = new Database(file);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   migrate(db, migrationsDir);
   return db;
+}
+
+/** Fails fast with an actionable message instead of SQLite's bare SQLITE_CANTOPEN. */
+export function ensureWritableDir(dir: string): void {
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.accessSync(dir, fs.constants.W_OK);
+  } catch {
+    const uid = process.getuid?.() ?? "?";
+    throw new Error(
+      `Data directory ${dir} is not writable by uid ${uid}. ` +
+        `On the host, run: sudo chown -R ${uid}:${uid} <your data folder>`,
+    );
+  }
 }
 
 export function migrate(db: Database.Database, dir: string): string[] {

@@ -9,7 +9,9 @@ COPY server/package.json server/
 COPY web/package.json web/
 RUN npm ci
 COPY . .
-RUN npm run build && npm prune --omit=dev
+# URL prefix when served under a path-based proxy (e.g. /store/); baked into the web build.
+ARG BASE_PATH=/
+RUN BASE_PATH="$BASE_PATH" npm run build && npm prune --omit=dev
 
 FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production DATA_DIR=/data WEB_DIR=/app/web/dist PORT=3000
@@ -24,5 +26,5 @@ RUN mkdir /data && chown node:node /data
 USER node
 VOLUME /data
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=3s CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s CMD ["node", "server/dist/healthcheck.js"]
 CMD ["node", "server/dist/index.js"]

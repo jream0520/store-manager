@@ -1,12 +1,14 @@
 services:
   app:
-    build: .
+    build:
+      context: .
+      args:
+        BASE_PATH: ${BASE_PATH:-/}
     image: store-manager:latest
     restart: unless-stopped
     volumes:
       - ./data:/data
-    # Plain HTTP on loopback only; the host's existing TLS reverse proxy forwards to it.
-    # If the proxy itself runs in Docker, remove `ports` and attach this service to the
-    # proxy's network instead (see README).
+    # Plain HTTP; the host's TLS reverse proxy forwards to it. APP_BIND defaults to
+    # loopback; set it to the host's LAN IP if the proxy reaches services that way.
     ports:
-      - "127.0.0.1:${APP_PORT:-3000}:3000"
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"

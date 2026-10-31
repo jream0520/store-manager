@@ -1,6 +1,6 @@
 <script lang="ts">
   let health = $state("checking…");
-  fetch("/api/health")
+  fetch(`${import.meta.env.BASE_URL}api/health`)
     .then((r) => r.json())
     .then((j) => (health = `server ${j.status}`))
     .catch(() => (health = "server unreachable"));

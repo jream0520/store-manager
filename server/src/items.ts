@@ -20,6 +20,9 @@ export interface Item {
   costCents: number | null;
   priceCents: number | null;
   status: Status;
+  /** Current shop placement (M4), when status is in_shop. */
+  placedOn: string | null;
+  location: string | null;
   notes: string;
   archived: boolean;
   /** Missing price, cost or category: typically created via quick-add (F7). */
@@ -40,6 +43,8 @@ interface ItemRow {
   cost_cents: number | null;
   price_cents: number | null;
   status: Status;
+  placed_on: string | null;
+  location: string | null;
   notes: string;
   archived_at: string | null;
   created_at: string;
@@ -74,12 +79,16 @@ const SORTS = {
   name: "i.name COLLATE NOCASE ASC, i.id DESC",
   price_asc: "i.price_cents IS NULL, i.price_cents ASC, i.id DESC",
   price_desc: "i.price_cents IS NULL, i.price_cents DESC, i.id DESC",
+  placed: "pl.placed_on IS NULL, pl.placed_on ASC, i.id ASC",
 } as const;
 
 const COLUMNS = `i.*, c.name AS category_name,
   (SELECT p.id FROM photos p WHERE p.item_id = i.id ORDER BY p.sort_order, p.created_at LIMIT 1) AS cover_photo_id,
-  (SELECT COUNT(*) FROM photos p WHERE p.item_id = i.id) AS photo_count`;
-const SELECT = `SELECT ${COLUMNS} FROM items i LEFT JOIN categories c ON c.id = i.category_id`;
+  (SELECT COUNT(*) FROM photos p WHERE p.item_id = i.id) AS photo_count,
+  pl.placed_on, pl.location`;
+const JOINS = `LEFT JOIN categories c ON c.id = i.category_id
+  LEFT JOIN placements pl ON pl.item_id = i.id AND pl.removed_on IS NULL`;
+const SELECT = `SELECT ${COLUMNS} FROM items i ${JOINS}`;
 const INCOMPLETE_SQL = "(i.price_cents IS NULL OR i.cost_cents IS NULL OR i.category_id IS NULL)";
 
 function toItem(r: ItemRow): Item {
@@ -96,6 +105,8 @@ function toItem(r: ItemRow): Item {
     costCents: r.cost_cents,
     priceCents: r.price_cents,
     status: r.status,
+    placedOn: r.placed_on,
+    location: r.location,
     notes: r.notes,
     archived: r.archived_at !== null,
     incomplete: r.price_cents === null || r.cost_cents === null || r.category_id === null,
@@ -118,7 +129,10 @@ export function getItem(db: Database.Database, id: number): Item | undefined {
   return row && toItem(row);
 }
 
-export function listItems(db: Database.Database, q: ListQuery): { items: Item[]; total: number } {
+export function listItems(
+  db: Database.Database,
+  q: ListQuery,
+): { items: Item[]; total: number; totalPriceCents: number } {
   const where: string[] = [];
   const params: (string | number)[] = [];
 
@@ -162,13 +176,17 @@ export function listItems(db: Database.Database, q: ListQuery): { items: Item[];
   }
 
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
-  const from = `FROM items i LEFT JOIN categories c ON c.id = i.category_id ${whereSql}`;
-  const total = (db.prepare(`SELECT COUNT(*) AS n ${from}`).get(...params) as { n: number }).n;
+  const from = `FROM items i ${JOINS} ${whereSql}`;
+  // Totals cover every match, not just this page (e.g. retail value of everything in the shop).
+  const totals = db.prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(i.price_cents), 0) AS v ${from}`).get(...params) as {
+    n: number;
+    v: number;
+  };
   const order = SORTS[q.sort ?? "newest"] ?? SORTS.newest;
   const rows = db
     .prepare(`SELECT ${COLUMNS} ${from} ORDER BY ${order} LIMIT ? OFFSET ?`)
     .all(...params, q.limit ?? 100, q.offset ?? 0) as ItemRow[];
-  return { items: rows.map(toItem), total };
+  return { items: rows.map(toItem), total: totals.n, totalPriceCents: totals.v };
 }
 
 export function createItem(db: Database.Database, input: ItemInput & { name: string }): Item {
@@ -190,6 +208,24 @@ export function createItem(db: Database.Database, input: ItemInput & { name: str
 }
 
 export function updateItem(db: Database.Database, id: number, input: ItemInput): Item | undefined {
+  return db.transaction(() => {
+    if (input.priceCents !== undefined) recordPriceChange(db, id, input.priceCents);
+    return applyUpdate(db, id, input);
+  })();
+}
+
+/** Logs a price change (F5) when the new price differs from the stored one. */
+function recordPriceChange(db: Database.Database, id: number, next: number | null) {
+  const row = db.prepare("SELECT price_cents FROM items WHERE id = ?").get(id) as { price_cents: number | null } | undefined;
+  if (!row || row.price_cents === next) return;
+  db.prepare("INSERT INTO item_events (item_id, kind, old_cents, new_cents) VALUES (?, 'price', ?, ?)").run(
+    id,
+    row.price_cents,
+    next,
+  );
+}
+
+function applyUpdate(db: Database.Database, id: number, input: ItemInput): Item | undefined {
   const sets: string[] = [];
   const params: (string | number | null)[] = [];
   const set = (col: string, v: string | number | null) => {

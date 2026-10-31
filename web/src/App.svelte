@@ -35,7 +35,9 @@
   });
 
   const itemParams = $derived(match("/items/:id"));
-  const tab = $derived(route.path === "/settings" ? "settings" : route.path === "/items/new" ? "new" : "items");
+  const tab = $derived(
+    route.path === "/settings" ? "settings" : route.path === "/items/new" ? "new" : route.path === "/shop" ? "shop" : "items",
+  );
 </script>
 
 {#if !session.checked}
@@ -52,6 +54,8 @@
     {#key route.path}
       {#if route.path === "/"}
         <Items />
+      {:else if route.path === "/shop"}
+        <Items view="shop" />
       {:else if route.path === "/items/new"}
         <ItemEditor />
       {:else if route.path === "/items/quick"}
@@ -70,6 +74,9 @@
   <nav aria-label="Main">
     <a href={href("/")} aria-current={tab === "items" ? "page" : undefined}>
       <span class="icon" aria-hidden="true">☰</span>Items
+    </a>
+    <a href={href("/shop")} aria-current={tab === "shop" ? "page" : undefined}>
+      <span class="icon" aria-hidden="true">⌂</span>In shop
     </a>
     <a href={href("/items/new")} aria-current={tab === "new" ? "page" : undefined}>
       <span class="icon" aria-hidden="true">＋</span>Add

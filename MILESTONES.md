@@ -60,17 +60,19 @@ M1 is deliberately early: iOS PWA and camera behavior is the largest risk, so it
 - ✅ Thumbnails generated on the phone with the full image (≤ 2000 px + ≤ 480 px JPEGs); the server validates JPEG structure and size and stores both as-is. Lazy-loaded thumbs in the list (F9). See ADR 0001 for why not server-side.
 - ✅ Camera-first new item: photos can be taken before the item is saved and upload on create (F11). Quick add takes one photo.
 - ✅ Storage at `data/photos/<uuid>.jpg` and `.thumb.jpg`; temp-file writes; orphan and temp files swept at startup; immutable cache headers.
-- ⬜ Verify on iPhone: real camera photos, HEIC from the library, speed.
+- ✅ Verified on iPhone: camera, library and HEIC photos (2026-10-31).
 
 **Done when:** the add-item flow from camera to saved record takes under 30 seconds, and the list scrolls smoothly with a few hundred photos.
 
 ## M4 — Shop placement and status
 **Goal:** Know what is where.
-- Status lifecycle with timestamped StatusEvents (F3).
-- Bulk "place in shop" with a date and optional location note (F12).
-- "In shop now" view with total retail value (F13).
-- Pull back to studio; write-off with reason (F14).
-- Price change history (F5), since it touches the same edit paths.
+- ✅ Status changes as explicit actions (place, pull back, write off, restore), each with an owner-chosen date (backdating allowed, not future). Bulk requests are all-or-nothing. Status can't be set through the item edit form (F3).
+- ✅ Bulk select on the Items and In shop lists; actions offered are those valid for every selected item. Place in shop takes a date and an optional location, editable later (F12).
+- ✅ "In shop" tab: everything on display, longest-placed first, days in shop and location per row, total count and retail value (F13).
+- ✅ Pull back to studio (bulk); write off with a required reason (lost, damaged, gifted, kept, other) plus note; restore (F14).
+- ✅ Item history: one `item_events` log of status and price changes, newest first (F5).
+- Decision: `Returned` is reserved for a sold item coming back from a customer (M5). Pulling an item from the shop sets it to `In studio`.
+- ⬜ Verify on iPhone after deploy.
 
 **Done when:** you can move a batch of items into the shop and see accurate in-shop lists and totals.
 

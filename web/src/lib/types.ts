@@ -21,6 +21,8 @@ export interface Item {
   costCents: number | null;
   priceCents: number | null;
   status: Status;
+  placedOn: string | null;
+  location: string | null;
   notes: string;
   archived: boolean;
   incomplete: boolean;
@@ -31,7 +33,12 @@ export interface Item {
 export interface ItemList {
   items: Item[];
   total: number;
+  totalPriceCents: number;
 }
+
+export type HistoryEntry =
+  | { type: "status"; from: Status; to: Status; on: string; note: string; recordedAt: string }
+  | { type: "price"; oldCents: number | null; newCents: number | null; recordedAt: string };
 
 export interface Category {
   id: number;

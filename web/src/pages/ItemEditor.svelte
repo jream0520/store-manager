@@ -1,12 +1,14 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import PhotoManager, { type PendingPhoto } from "../components/PhotoManager.svelte";
+  import StatusDialog from "../components/StatusDialog.svelte";
   import { get, patch, post } from "../lib/api";
   import { centsToInput, formatMoney, parseMoney } from "../lib/money";
   import { uploadPending } from "../lib/photos";
   import { href, navigate } from "../lib/router.svelte";
   import { session } from "../lib/session.svelte";
-  import { itemNumber, STATUS_LABELS, type Category, type Item } from "../lib/types";
+  import { ACTIONS, actionsFor, applyAction, daysSince, formatDay, type Action, type ActionDetails } from "../lib/status";
+  import { itemNumber, STATUS_LABELS, type Category, type HistoryEntry, type Item } from "../lib/types";
 
   let { id }: { id?: number } = $props();
 
@@ -26,6 +28,8 @@
   let busy = $state(false);
   let busyLabel = $state("");
   let pendingPhotos = $state<PendingPhoto[]>([]);
+  let dialog = $state<Action | null>(null);
+  let events = $state<HistoryEntry[]>([]);
   let error = $state("");
   let saved = $state(false);
   let tried = $state(false);
@@ -46,7 +50,10 @@
         id ? get<Item>(`/items/${id}`) : Promise.resolve(null),
       ]);
       categories = cats;
-      if (existing) fill(existing);
+      if (existing) {
+        fill(existing);
+        loadHistory();
+      }
       else if (id) notFound = true;
     } catch (e) {
       if ((e as { status?: number }).status === 404) notFound = true;
@@ -104,6 +111,7 @@
       if (item) {
         fill(await patch<Item>(`/items/${item.id}`, body));
         flashSaved();
+        loadHistory();
       } else {
         busyLabel = "Saving…";
         const created = await post<Item>("/items", body);
@@ -143,6 +151,43 @@
   async function refreshItem() {
     if (item) item = await get<Item>(`/items/${item.id}`);
   }
+
+  async function loadHistory() {
+    if (item) events = await get<HistoryEntry[]>(`/items/${item.id}/history`).catch(() => events);
+  }
+
+  async function runAction(d: ActionDetails) {
+    if (!item || !dialog) return;
+    const [updated] = await applyAction([item.id], dialog, d);
+    item = updated;
+    dialog = null;
+    loadHistory();
+  }
+
+  async function editLocation() {
+    if (!item) return;
+    const loc = prompt("Where is it in the shop?", item.location ?? "");
+    if (loc === null) return;
+    try {
+      item = await patch<Item>(`/items/${item.id}/placement`, { location: loc });
+      error = "";
+    } catch (e) {
+      error = (e as Error).message;
+    }
+  }
+
+  function describe(h: HistoryEntry): string {
+    if (h.type === "price") {
+      return `Price ${formatMoney(h.oldCents, currency)} → ${formatMoney(h.newCents, currency)}`;
+    }
+    const base =
+      h.to === "in_shop" ? "Placed in shop" :
+      h.from === "in_shop" && h.to === "in_studio" ? "Pulled back to studio" :
+      h.to === "written_off" ? "Written off" :
+      h.from === "written_off" ? "Restored to studio" :
+      `${STATUS_LABELS[h.from]} → ${STATUS_LABELS[h.to]}`;
+    return h.note ? `${base} · ${h.note}` : base;
+  }
 </script>
 
 <p><a href={href("/")} onclick={(e) => { if (history.length > 1 && !justCreated) { e.preventDefault(); history.back(); } }}>‹ Items</a></p>
@@ -163,6 +208,28 @@
     {#if justCreated}<p class="created card">Saved. Write <strong>{itemNumber(item.number)}</strong> on the price tag.</p>{/if}
     {#if failedUploads}<p class="error">{failedUploads} photo{failedUploads === 1 ? "" : "s"} didn't upload. Add {failedUploads === 1 ? "it" : "them"} again below.</p>{/if}
     <PhotoManager itemId={item.id} onchange={refreshItem} />
+
+    <div class="status card">
+      <div>
+        <strong>{STATUS_LABELS[item.status]}</strong>
+        {#if item.status === "in_shop" && item.placedOn}
+          <span class="muted">since {formatDay(item.placedOn)} ({daysSince(item.placedOn)} days)</span>
+          <div class="muted loc">
+            {item.location || "No location noted"}
+            <button type="button" class="link" onclick={editLocation}>{item.location ? "Change" : "Add"}</button>
+          </div>
+        {/if}
+      </div>
+      {#if !item.archived}
+        <div class="row status-actions">
+          {#each actionsFor([item.status]) as a}
+            <button type="button" class={a === "write_off" ? "danger" : a === "place" ? "primary" : ""} onclick={() => (dialog = a)}>
+              {ACTIONS[a].label}
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </div>
   {:else}
     <h1>New item</h1>
     <PhotoManager bind:pending={pendingPhotos} />
@@ -214,6 +281,18 @@
     </div>
   </form>
 
+  {#if item && events.length}
+    <h2>History</h2>
+    <ul class="history">
+      {#each events as h}
+        <li>
+          <span class="when">{h.type === "status" ? formatDay(h.on) : formatDay(h.recordedAt.slice(0, 10))}</span>
+          <span>{describe(h)}</span>
+        </li>
+      {/each}
+    </ul>
+  {/if}
+
   {#if item}
     <div class="archive">
       {#if item.archived}
@@ -223,6 +302,10 @@
       {/if}
     </div>
   {/if}
+{/if}
+
+{#if dialog && item}
+  <StatusDialog action={dialog} count={1} onconfirm={runAction} oncancel={() => (dialog = null)} />
 {/if}
 
 <style>
@@ -259,6 +342,41 @@
     margin-top: 20px;
     position: sticky;
     bottom: calc(68px + env(safe-area-inset-bottom));
+  }
+  .status {
+    margin: 12px 0 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .loc {
+    font-size: 14px;
+    margin-top: 2px;
+  }
+  .loc .link {
+    font-size: 14px;
+    min-height: 0;
+    margin-left: 6px;
+  }
+  .status-actions button {
+    flex: 1 1 auto;
+  }
+  .history {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 14px;
+  }
+  .history li {
+    display: flex;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .when {
+    color: var(--muted);
+    min-width: 4.5em;
+    font-variant-numeric: tabular-nums;
   }
   .archive {
     margin: 32px 0 16px;

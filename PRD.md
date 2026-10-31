@@ -61,7 +61,7 @@ Priority: **P0** = must for v1, **P1** = should for v1, **P2** = later.
 ### 5.1 Items
 - **F1 (P0)** Create/edit/archive an item with: name, description, category, tags, materials cost, retail price, status, optional SKU/tag number, notes.
 - **F2 (P0)** Auto-generated short, sequential numeric item number (e.g. `42`, displayed `0042`) that is easy to hand-write on a price tag and is shown prominently on the item screen. Numbers are never reused. Lookup ignores leading zeros.
-- **F3 (P0)** Status lifecycle: `In studio` → `In shop` → `Sold`. Also `Returned` and `Written off` (lost/damaged/gifted). Every status change is timestamped.
+- **F3 (P0)** Status lifecycle: `In studio` → `In shop` → `Sold`. Also `Returned` (a sold item a customer brought back, M5) and `Written off` (lost/damaged/gifted/kept). Every status change is logged with the date it happened. Pulling an item from the shop returns it to `In studio`.
 - **F4 (P0)** List view with thumbnail, price, status. Search by name/number/tag; filter by status and category; sort by date, price.
 - **F5 (P1)** Price history (each change is logged with date).
 - **F6 (P1)** Duplicate an item as a template for similar pieces.

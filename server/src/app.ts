@@ -10,6 +10,7 @@ import type { Config } from "./config.js";
 import { itemRoutes } from "./items.js";
 import { PhotoStore, photoRoutes } from "./photos.js";
 import { settingsRoutes } from "./settings.js";
+import { statusRoutes } from "./status.js";
 
 export interface AppOptions {
   limiter?: LoginLimiter;
@@ -42,6 +43,7 @@ export function buildApp(config: Config, db: Database.Database, opts: AppOptions
     await api.register(categoryRoutes(db));
     await api.register(itemRoutes(db));
     await api.register(photoRoutes(db, photos));
+    await api.register(statusRoutes(db));
   });
 
   if (fs.existsSync(config.webDir)) {

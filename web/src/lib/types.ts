@@ -23,6 +23,7 @@ export interface Item {
   status: Status;
   placedOn: string | null;
   location: string | null;
+  sale: { id: number; saleDate: string; soldCents: number; reportId: number | null } | null;
   notes: string;
   archived: boolean;
   incomplete: boolean;

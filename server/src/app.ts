@@ -9,6 +9,7 @@ import { categoryRoutes } from "./categories.js";
 import type { Config } from "./config.js";
 import { itemRoutes } from "./items.js";
 import { PhotoStore, photoRoutes } from "./photos.js";
+import { salesRoutes } from "./sales.js";
 import { settingsRoutes } from "./settings.js";
 import { statusRoutes } from "./status.js";
 
@@ -44,6 +45,7 @@ export function buildApp(config: Config, db: Database.Database, opts: AppOptions
     await api.register(itemRoutes(db));
     await api.register(photoRoutes(db, photos));
     await api.register(statusRoutes(db));
+    await api.register(salesRoutes(db));
   });
 
   if (fs.existsSync(config.webDir)) {

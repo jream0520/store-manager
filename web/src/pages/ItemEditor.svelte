@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import PhotoManager, { type PendingPhoto } from "../components/PhotoManager.svelte";
+  import SellDialog from "../components/SellDialog.svelte";
   import StatusDialog from "../components/StatusDialog.svelte";
+  import { getSale, undoSale, type Sale } from "../lib/sales";
   import { get, patch, post } from "../lib/api";
   import { centsToInput, formatMoney, parseMoney } from "../lib/money";
   import { uploadPending } from "../lib/photos";
@@ -29,6 +31,9 @@
   let busyLabel = $state("");
   let pendingPhotos = $state<PendingPhoto[]>([]);
   let dialog = $state<Action | null>(null);
+  let selling = $state(false);
+  // Full sale details (profit, flags) for a sold item; the item itself only carries a summary.
+  let sale = $state<Sale | null>(null);
   let events = $state<HistoryEntry[]>([]);
   let error = $state("");
   let saved = $state(false);
@@ -53,6 +58,7 @@
       if (existing) {
         fill(existing);
         loadHistory();
+        loadSale();
       }
       else if (id) notFound = true;
     } catch (e) {
@@ -156,6 +162,32 @@
     if (item) events = await get<HistoryEntry[]>(`/items/${item.id}/history`).catch(() => events);
   }
 
+  async function loadSale() {
+    if (!item?.sale) {
+      sale = null;
+      return;
+    }
+    sale = await getSale(item.sale.id).catch(() => null);
+  }
+
+  async function afterSale() {
+    selling = false;
+    await refreshItem();
+    await loadSale();
+    loadHistory();
+  }
+
+  async function undo() {
+    if (!item?.sale) return;
+    if (!confirm("Undo this sale? The item goes back to where it was before.")) return;
+    try {
+      await undoSale(item.sale.id);
+      await afterSale();
+    } catch (e) {
+      error = (e as Error).message;
+    }
+  }
+
   async function runAction(d: ActionDetails) {
     if (!item || !dialog) return;
     const [updated] = await applyAction([item.id], dialog, d);
@@ -181,12 +213,14 @@
       return `Price ${formatMoney(h.oldCents, currency)} → ${formatMoney(h.newCents, currency)}`;
     }
     const base =
+      h.to === "sold" ? "Sold" :
+      h.from === "sold" ? `Sale undone, back to ${STATUS_LABELS[h.to].toLowerCase()}` :
       h.to === "in_shop" ? "Placed in shop" :
       h.from === "in_shop" && h.to === "in_studio" ? "Pulled back to studio" :
       h.to === "written_off" ? "Written off" :
       h.from === "written_off" ? "Restored to studio" :
       `${STATUS_LABELS[h.from]} → ${STATUS_LABELS[h.to]}`;
-    return h.note ? `${base} · ${h.note}` : base;
+    return h.note && h.from !== "sold" ? `${base} · ${h.note}` : base;
   }
 </script>
 
@@ -219,9 +253,28 @@
             <button type="button" class="link" onclick={editLocation}>{item.location ? "Change" : "Add"}</button>
           </div>
         {/if}
+        {#if item.status === "sold" && item.sale}
+          <span class="muted">{formatDay(item.sale.saleDate)} for {formatMoney(item.sale.soldCents, currency)}</span>
+          <div class="muted loc">
+            {#if sale?.profitCents != null}
+              Profit {formatMoney(sale.profitCents, currency)}
+            {:else}
+              Add a materials cost to see profit.
+            {/if}
+            {#if sale?.priceDiffers && sale.retailCents !== null}· retail was {formatMoney(sale.retailCents, currency)}{/if}
+            {#if item.sale.reportId}· <a href={href(`/reports/${item.sale.reportId}`)}>on report</a>{/if}
+          </div>
+        {/if}
       </div>
       {#if !item.archived}
         <div class="row status-actions">
+          {#if item.status === "in_shop" || item.status === "in_studio"}
+            <button type="button" class={item.status === "in_shop" ? "primary" : ""} onclick={() => (selling = true)}>Mark sold</button>
+          {/if}
+          {#if item.status === "sold" && item.sale}
+            <button type="button" onclick={() => (selling = true)} disabled={!sale}>Edit sale</button>
+            <button type="button" class="danger" onclick={undo}>Undo sale</button>
+          {/if}
           {#each actionsFor([item.status]) as a}
             <button type="button" class={a === "write_off" ? "danger" : a === "place" ? "primary" : ""} onclick={() => (dialog = a)}>
               {ACTIONS[a].label}
@@ -306,6 +359,10 @@
 
 {#if dialog && item}
   <StatusDialog action={dialog} count={1} onconfirm={runAction} oncancel={() => (dialog = null)} />
+{/if}
+
+{#if selling && item}
+  <SellDialog {item} sale={item.status === "sold" ? sale : null} ondone={afterSale} oncancel={() => (selling = false)} />
 {/if}
 
 <style>

@@ -8,6 +8,8 @@
   import Items from "./pages/Items.svelte";
   import Login from "./pages/Login.svelte";
   import QuickAdd from "./pages/QuickAdd.svelte";
+  import Reconcile from "./pages/Reconcile.svelte";
+  import Sales from "./pages/Sales.svelte";
   import SettingsPage from "./pages/Settings.svelte";
 
   let loadError = $state("");
@@ -35,8 +37,9 @@
   });
 
   const itemParams = $derived(match("/items/:id"));
+  const reportParams = $derived(match("/reports/:id"));
   const tab = $derived(
-    route.path === "/settings" ? "settings" : route.path === "/items/new" ? "new" : route.path === "/shop" ? "shop" : "items",
+    route.path === "/settings" ? "settings" : route.path === "/items/new" ? "new" : route.path === "/shop" ? "shop" : route.path === "/sales" || route.path.startsWith("/reports/") ? "sales" : "items",
   );
 </script>
 
@@ -62,6 +65,10 @@
         <QuickAdd />
       {:else if itemParams && /^\d+$/.test(itemParams.id)}
         <ItemEditor id={Number(itemParams.id)} />
+      {:else if route.path === "/sales"}
+        <Sales />
+      {:else if reportParams && /^\d+$/.test(reportParams.id)}
+        <Reconcile id={Number(reportParams.id)} />
       {:else if route.path === "/settings"}
         <SettingsPage />
       {:else}
@@ -77,6 +84,9 @@
     </a>
     <a href={href("/shop")} aria-current={tab === "shop" ? "page" : undefined}>
       <span class="icon" aria-hidden="true">⌂</span>In shop
+    </a>
+    <a href={href("/sales")} aria-current={tab === "sales" ? "page" : undefined}>
+      <span class="icon" aria-hidden="true">＄</span>Sales
     </a>
     <a href={href("/items/new")} aria-current={tab === "new" ? "page" : undefined}>
       <span class="icon" aria-hidden="true">＋</span>Add

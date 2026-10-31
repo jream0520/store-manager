@@ -72,17 +72,19 @@ M1 is deliberately early: iOS PWA and camera behavior is the largest risk, so it
 - ✅ Pull back to studio (bulk); write off with a required reason (lost, damaged, gifted, kept, other) plus note; restore (F14).
 - ✅ Item history: one `item_events` log of status and price changes, newest first (F5).
 - Decision: `Returned` is reserved for a sold item coming back from a customer (M5). Pulling an item from the shop sets it to `In studio`.
-- ⬜ Verify on iPhone after deploy.
+- ✅ Verified on iPhone after deploy (2026-10-31).
 
 **Done when:** you can move a batch of items into the shop and see accurate in-shop lists and totals.
 
 ## M5 — Sales and reconciliation
 **Goal:** The core workflow: shop report → recorded sales.
-- Mark sold with date and price, defaulting to retail; edit and undo (F15).
-- ShopReport records (period, received date, reported total).
-- Reconciliation flow: create a report period, enter sold items by item number (number pad → photo and price shown → confirm → next), with the in-shop list as a fallback; running count and total versus the reported total (F16, F17).
-- Discrepancy flags: unknown item number, sold item not in shop, price differs from retail, duplicate (F18).
-- Profit per item (F21).
+- ✅ Mark sold from the item page with date and price (default retail); edit and undo. Undo restores the previous status and reopens the shop placement with its original date and location (F15).
+- ✅ Shop reports: period, received date, optional reported item count and total; editable; mark reconciled or reopen; delete keeps the sales (unlinked).
+- ✅ Reconcile screen: number entry → photo, status, location and retail shown → sold price and sticky sale date → record → focus returns to the number box. "Pick from what's in the shop" fallback. Running count and total against the reported figures, with "matches" or what's still off (F16, F17).
+- ✅ Discrepancies: unknown number; already sold (duplicate line or misread number, shows when and which report); not in shop (needs "Record anyway"); sold price differs from retail (flagged on the line); written-off/archived items can't be sold (F18).
+- ✅ Profit per sale uses the item's current cost; totals count sales without a cost separately. Sales tab shows this month's count, sales and profit (F21).
+- Not built: customer returns of a sold item (the reserved `Returned` status). Undo covers mistakes; a real return can be handled later if it happens.
+- ⬜ Reconcile a real report on the iPhone and time it.
 
 **Done when:** a sample real report can be reconciled end-to-end in under 5 minutes and the totals match.
 

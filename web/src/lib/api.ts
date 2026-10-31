@@ -7,6 +7,8 @@ export class ApiError extends Error {
     public status: number,
     message: string,
     public retryAfter?: number,
+    /** The full error body, for endpoints that return details (e.g. the existing sale on a duplicate). */
+    public data: Record<string, unknown> = {},
   ) {
     super(message);
   }
@@ -27,7 +29,7 @@ export async function api<T>(method: string, path: string, body?: unknown): Prom
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     if (res.status === 401 && !path.startsWith("/auth/")) session.authenticated = false;
-    throw new ApiError(res.status, friendly(res.status, data.error ?? res.statusText), data.retryAfter);
+    throw new ApiError(res.status, friendly(res.status, data.error ?? res.statusText), data.retryAfter, data);
   }
   return data as T;
 }

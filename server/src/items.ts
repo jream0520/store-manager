@@ -23,6 +23,8 @@ export interface Item {
   /** Current shop placement (M4), when status is in_shop. */
   placedOn: string | null;
   location: string | null;
+  /** Set when status is sold (M5). */
+  sale: { id: number; saleDate: string; soldCents: number; reportId: number | null } | null;
   notes: string;
   archived: boolean;
   /** Missing price, cost or category: typically created via quick-add (F7). */
@@ -45,6 +47,10 @@ interface ItemRow {
   status: Status;
   placed_on: string | null;
   location: string | null;
+  sale_id: number | null;
+  sale_date: string | null;
+  sold_cents: number | null;
+  sale_report_id: number | null;
   notes: string;
   archived_at: string | null;
   created_at: string;
@@ -85,9 +91,11 @@ const SORTS = {
 const COLUMNS = `i.*, c.name AS category_name,
   (SELECT p.id FROM photos p WHERE p.item_id = i.id ORDER BY p.sort_order, p.created_at LIMIT 1) AS cover_photo_id,
   (SELECT COUNT(*) FROM photos p WHERE p.item_id = i.id) AS photo_count,
-  pl.placed_on, pl.location`;
+  pl.placed_on, pl.location,
+  s.id AS sale_id, s.sale_date, s.sold_cents, s.report_id AS sale_report_id`;
 const JOINS = `LEFT JOIN categories c ON c.id = i.category_id
-  LEFT JOIN placements pl ON pl.item_id = i.id AND pl.removed_on IS NULL`;
+  LEFT JOIN placements pl ON pl.item_id = i.id AND pl.removed_on IS NULL
+  LEFT JOIN sales s ON s.item_id = i.id`;
 const SELECT = `SELECT ${COLUMNS} FROM items i ${JOINS}`;
 const INCOMPLETE_SQL = "(i.price_cents IS NULL OR i.cost_cents IS NULL OR i.category_id IS NULL)";
 
@@ -107,6 +115,10 @@ function toItem(r: ItemRow): Item {
     status: r.status,
     placedOn: r.placed_on,
     location: r.location,
+    sale:
+      r.sale_id === null
+        ? null
+        : { id: r.sale_id, saleDate: r.sale_date!, soldCents: r.sold_cents!, reportId: r.sale_report_id },
     notes: r.notes,
     archived: r.archived_at !== null,
     incomplete: r.price_cents === null || r.cost_cents === null || r.category_id === null,

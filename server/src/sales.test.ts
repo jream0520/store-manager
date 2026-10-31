@@ -133,7 +133,8 @@ describe("shop reports and reconciliation", () => {
     expect(got).toMatchObject({ enteredCount: 2, enteredTotalCents: 6800 });
 
     const sales = (await call("GET", `/api/sales?reportId=${r.id}`)).json();
-    expect(sales).toMatchObject({ count: 2, totalCents: 6800, profitCents: 3600, missingCostCount: 1 });
+    // Hoops has no cost yet: counted at zero cost and flagged.
+    expect(sales).toMatchObject({ count: 2, totalCents: 6800, profitCents: 3600 + 2000, missingCostCount: 1 });
     expect(sales.sales.map((s: { itemName: string }) => s.itemName)).toEqual(["Hoops", "Scarf"]);
   });
 

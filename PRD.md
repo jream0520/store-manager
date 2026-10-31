@@ -18,7 +18,7 @@ It runs as one Docker container on the owner's hosted server and is used from an
 | Business model | Booth/space rental. The owner keeps sale proceeds. Payments are taken by the shop, which pays the owner; the app does **not** process payments or track payouts. |
 | Sales tax | Collected and remitted by the shop. The app ignores tax. |
 | Inventory | Mostly unique, one-of-a-kind pieces. Each item is its own record (quantity = 1). Small scale: under a few hundred items/year, 1–3 photos each. |
-| Physical tags | Hand-written price tags. The owner writes the app's item number on each tag. |
+| Physical tags | Pre-assigned tag numbers, not always used in order. The owner types the tag's number when adding an item (or accepts the suggested one). |
 | Sales intake | The shop sends periodic reports (email/PDF/spreadsheet) that identify each sale **by the owner's item number**. The owner enters sales by hand. |
 | Financials | Retail price, sold price, sale date, and a single materials-cost total per item, giving profit per item. |
 | Existing data | None to import; the few current items are entered by hand. |
@@ -60,7 +60,7 @@ Priority: **P0** = must for v1, **P1** = should for v1, **P2** = later.
 
 ### 5.1 Items
 - **F1 (P0)** Create/edit/archive an item with: name, description, category, tags, materials cost, retail price, status, optional SKU/tag number, notes.
-- **F2 (P0)** Auto-generated short, sequential numeric item number (e.g. `42`, displayed `0042`) that is easy to hand-write on a price tag and is shown prominently on the item screen. Numbers are never reused. Lookup ignores leading zeros.
+- **F2 (P0)** Item number = the number on the item's price tag (1–999999, displayed `0042`). The owner can enter their own pre-assigned tag number or accept a suggestion (one after the last item entered, skipping used numbers). Numbers are unique: duplicates are caught as you type and refused on save. Editable later. Lookup ignores leading zeros.
 - **F3 (P0)** Status lifecycle: `In studio` → `In shop` → `Sold`. Also `Returned` (a sold item a customer brought back, M5) and `Written off` (lost/damaged/gifted/kept). Every status change is logged with the date it happened. Pulling an item from the shop returns it to `In studio`.
 - **F4 (P0)** List view with thumbnail, price, status. Search by name/number/tag; filter by status and category; sort by date, price.
 - **F5 (P1)** Price history (each change is logged with date).
@@ -88,7 +88,7 @@ Priority: **P0** = must for v1, **P1** = should for v1, **P2** = later.
 
 ### 5.5 Costs and profit
 - **F21 (P0)** Per-item materials cost; profit = sold price − materials cost.
-- **F22 (P1)** Shop-level costs (booth rent, card fees, other) as dated expense entries, to get true net profit. This is not required to use the app, but it is the most common thing missed in booth-rental setups.
+- **F22 (P1)** Shop-level costs (booth rent, fees, supplies, marketing, other) as dated expense entries, to get true net profit. This is not required to use the app, but it is the most common thing missed in booth-rental setups.
 
 ### 5.6 Reports and dashboard
 - **F23 (P0)** Dashboard: counts by status, in-shop retail value, sales and profit this month and YTD, recent activity.

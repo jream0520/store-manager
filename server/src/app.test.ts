@@ -6,6 +6,6 @@ describe("health", () => {
     const { app } = newApp();
     const res = await app.inject("/api/health");
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ status: "ok", migrations: 5 });
+    expect(res.json()).toEqual({ status: "ok", migrations: 7 });
   });
 });

@@ -1,6 +1,8 @@
 <script lang="ts">
+  import { onMount } from "svelte";
+  import NumberField from "../components/NumberField.svelte";
   import PhotoManager, { type PendingPhoto } from "../components/PhotoManager.svelte";
-  import { post } from "../lib/api";
+  import { ApiError, get, post } from "../lib/api";
   import { uploadPending } from "../lib/photos";
   import { formatMoney, parseMoney } from "../lib/money";
   import { href } from "../lib/router.svelte";
@@ -8,6 +10,9 @@
   import { itemNumber, type Item } from "../lib/types";
 
   // PRD F7: capture a photo, name and price now; fill in cost/category later (flagged incomplete).
+  let numberText = $state("");
+  let numberOk = $state(false);
+  let numberField = $state<ReturnType<typeof NumberField>>();
   let name = $state("");
   let price = $state("");
   let busy = $state(false);
@@ -19,7 +24,13 @@
   let nameEl = $state<HTMLInputElement>();
 
   const priceCents = $derived(parseMoney(price));
-  const valid = $derived(name.trim().length > 0 && priceCents !== undefined);
+  const valid = $derived(numberOk && name.trim().length > 0 && priceCents !== undefined);
+
+  onMount(suggestNumber);
+
+  async function suggestNumber() {
+    numberText = String((await get<{ number: number }>("/items/next-number")).number);
+  }
 
   async function submit(e: SubmitEvent) {
     e.preventDefault();
@@ -27,7 +38,8 @@
     busy = true;
     error = "";
     try {
-      const item = await post<Item>("/items", { name: name.trim(), priceCents });
+      const number = Number(numberText.trim().replace("#", ""));
+      const item = await post<Item>("/items", { number, name: name.trim(), priceCents });
       const hadPhoto = pending.length > 0;
       const photoFailed = (await uploadPending(item.id, pending)) > 0;
       pending = [];
@@ -35,9 +47,15 @@
       added = [{ ...item, hasPhoto: hadPhoto && !photoFailed, photoFailed }, ...added];
       name = "";
       price = "";
+      await suggestNumber();
       nameEl?.focus();
     } catch (err) {
-      error = (err as Error).message;
+      if (err instanceof ApiError && err.data.code === "duplicate_number") {
+        numberField?.markTaken(err.data.item as Item);
+        error = "That tag number is already used.";
+      } else {
+        error = (err as Error).message;
+      }
     } finally {
       busy = false;
     }
@@ -51,6 +69,7 @@
 {#key round}<PhotoManager bind:pending max={1} />{/key}
 
 <form onsubmit={submit} novalidate>
+  <NumberField id="qa-number" bind:this={numberField} bind:value={numberText} bind:ok={numberOk} />
   <label for="qa-name">Name</label>
   <!-- svelte-ignore a11y_autofocus -->
   <input id="qa-name" bind:this={nameEl} bind:value={name} maxlength="120" autocomplete="off" autofocus />

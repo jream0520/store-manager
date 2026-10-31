@@ -82,7 +82,7 @@
       return;
     }
     try {
-      showCandidate(await get<Item>(`/items/${n}`));
+      showCandidate(await get<Item>(`/items/by-number/${n}`));
     } catch (err) {
       lookupError =
         err instanceof ApiError && err.status === 404

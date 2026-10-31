@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import type Database from "better-sqlite3";
 import { idParams } from "./categories.js";
 
@@ -7,7 +7,7 @@ export type Status = (typeof STATUSES)[number];
 
 export interface Item {
   id: number;
-  /** The hand-written tag number. Same as id; ids are never reused. */
+  /** The tag number written or printed on the price tag. Unique; set by the owner or defaulted. */
   number: number;
   name: string;
   description: string;
@@ -35,6 +35,7 @@ export interface Item {
 
 interface ItemRow {
   id: number;
+  number: number;
   name: string;
   description: string;
   category_id: number | null;
@@ -58,6 +59,7 @@ interface ItemRow {
 }
 
 export interface ItemInput {
+  number?: number;
   name?: string;
   description?: string;
   categoryId?: number | null;
@@ -102,7 +104,7 @@ const INCOMPLETE_SQL = "(i.price_cents IS NULL OR i.cost_cents IS NULL OR i.cate
 function toItem(r: ItemRow): Item {
   return {
     id: r.id,
-    number: r.id,
+    number: r.number,
     name: r.name,
     description: r.description,
     categoryId: r.category_id,
@@ -180,7 +182,7 @@ export function listItems(
     });
     const textMatch = tokenClauses.join(" AND ");
     if (asNumber !== undefined) {
-      where.push(`(i.id = ? OR (${textMatch}))`);
+      where.push(`(i.number = ? OR (${textMatch}))`);
       params.splice(params.length - tokenClauses.length * 5, 0, asNumber);
     } else {
       where.push(`(${textMatch})`);
@@ -201,13 +203,56 @@ export function listItems(
   return { items: rows.map(toItem), total: totals.n, totalPriceCents: totals.v };
 }
 
+export const MAX_NUMBER = 999_999;
+
+/** The item using a tag number, if any. */
+export function itemByNumber(db: Database.Database, n: number): Item | undefined {
+  const row = db.prepare(`${SELECT} WHERE i.number = ?`).get(n) as ItemRow | undefined;
+  return row && toItem(row);
+}
+
+/**
+ * Suggested number for the next item: one after the most recently created item's number,
+ * skipping any already taken. Tags often come in pre-printed runs, so following the last
+ * entry fits better than "highest + 1".
+ */
+export function nextNumber(db: Database.Database): number {
+  const last = db.prepare("SELECT number FROM items ORDER BY id DESC LIMIT 1").get() as { number: number } | undefined;
+  let n = (last?.number ?? 0) + 1;
+  const taken = db.prepare("SELECT 1 FROM items WHERE number = ?");
+  while (n <= MAX_NUMBER && taken.get(n)) n++;
+  if (n > MAX_NUMBER) {
+    n = 1;
+    while (taken.get(n)) n++;
+  }
+  return n;
+}
+
+export class DuplicateNumberError extends Error {
+  constructor(readonly existing: Item) {
+    super(`number ${existing.number} is already used`);
+  }
+}
+
+function assertNumberFree(db: Database.Database, n: number, exceptId?: number) {
+  const existing = itemByNumber(db, n);
+  if (existing && existing.id !== exceptId) throw new DuplicateNumberError(existing);
+}
+
 export function createItem(db: Database.Database, input: ItemInput & { name: string }): Item {
+  return db.transaction(() => insertItem(db, input))();
+}
+
+function insertItem(db: Database.Database, input: ItemInput & { name: string }): Item {
+  const number = input.number ?? nextNumber(db);
+  assertNumberFree(db, number);
   const r = db
     .prepare(
-      `INSERT INTO items (name, description, category_id, tags, cost_cents, price_cents, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO items (number, name, description, category_id, tags, cost_cents, price_cents, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
+      number,
       input.name.trim(),
       input.description?.trim() ?? "",
       input.categoryId ?? null,
@@ -221,6 +266,7 @@ export function createItem(db: Database.Database, input: ItemInput & { name: str
 
 export function updateItem(db: Database.Database, id: number, input: ItemInput): Item | undefined {
   return db.transaction(() => {
+    if (input.number !== undefined) assertNumberFree(db, input.number, id);
     if (input.priceCents !== undefined) recordPriceChange(db, id, input.priceCents);
     return applyUpdate(db, id, input);
   })();
@@ -244,6 +290,7 @@ function applyUpdate(db: Database.Database, id: number, input: ItemInput): Item 
     sets.push(`${col} = ?`);
     params.push(v);
   };
+  if (input.number !== undefined) set("number", input.number);
   if (input.name !== undefined) set("name", input.name.trim());
   if (input.description !== undefined) set("description", input.description.trim());
   if (input.categoryId !== undefined) set("category_id", input.categoryId);
@@ -262,6 +309,7 @@ function applyUpdate(db: Database.Database, id: number, input: ItemInput): Item 
 
 const money = { type: ["integer", "null"], minimum: 0, maximum: 100_000_000 } as const;
 const itemProps = {
+  number: { type: "integer", minimum: 1, maximum: MAX_NUMBER },
   name: { type: "string", minLength: 1, maxLength: 120, pattern: "\\S" },
   description: { type: "string", maxLength: 4000 },
   categoryId: { type: ["integer", "null"], minimum: 1 },
@@ -295,6 +343,15 @@ export function itemRoutes(db: Database.Database) {
       async (req) => listItems(db, req.query),
     );
 
+    app.get("/api/items/next-number", async () => ({ number: nextNumber(db) }));
+
+    // Look up by tag number (reconciling, and checking a number is free before saving).
+    app.get<{ Params: { n: number } }>(
+      "/api/items/by-number/:n",
+      { schema: { params: { type: "object", required: ["n"], properties: { n: { type: "integer", minimum: 1 } } } } },
+      async (req, reply) => itemByNumber(db, req.params.n) ?? reply.code(404).send({ error: "no item with that number" }),
+    );
+
     app.get<{ Params: { id: number } }>("/api/items/:id", { schema: { params: idParams } }, async (req, reply) => {
       return getItem(db, req.params.id) ?? reply.code(404).send({ error: "not found" });
     });
@@ -307,6 +364,7 @@ export function itemRoutes(db: Database.Database) {
           return reply.code(201).send(createItem(db, req.body));
         } catch (e) {
           if (isForeignKey(e)) return reply.code(400).send({ error: "unknown category" });
+          if (e instanceof DuplicateNumberError) return duplicate(reply, e);
           throw e;
         }
       },
@@ -329,11 +387,21 @@ export function itemRoutes(db: Database.Database) {
           return updateItem(db, req.params.id, req.body) ?? reply.code(404).send({ error: "not found" });
         } catch (e) {
           if (isForeignKey(e)) return reply.code(400).send({ error: "unknown category" });
+          if (e instanceof DuplicateNumberError) return duplicate(reply, e);
           throw e;
         }
       },
     );
   };
+}
+
+function duplicate(reply: FastifyReply, e: DuplicateNumberError) {
+  const it = e.existing;
+  return reply.code(409).send({
+    error: `number ${it.number} is already used by “${it.name}”`,
+    code: "duplicate_number",
+    item: { id: it.id, number: it.number, name: it.name },
+  });
 }
 
 function isForeignKey(e: unknown): boolean {

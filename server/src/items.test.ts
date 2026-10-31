@@ -43,14 +43,47 @@ describe("items", () => {
     expect(listed.items.map((i: { id: number }) => i.id)).toEqual([item.id]);
   });
 
-  it("numbers items sequentially and never reuses numbers", async () => {
-    const { call, db } = await signedIn();
+  it("defaults the number to one after the last item entered, skipping taken numbers", async () => {
+    const { call } = await signedIn();
     const a = (await call("POST", "/api/items", { name: "A" })).json();
-    const b = (await call("POST", "/api/items", { name: "B" })).json();
-    expect(b.number).toBe(a.number + 1);
-    db.prepare("DELETE FROM items WHERE id = ?").run(b.id); // even after a hard delete
-    const c = (await call("POST", "/api/items", { name: "C" })).json();
-    expect(c.number).toBe(b.number + 1);
+    expect(a.number).toBe(1);
+    expect((await call("POST", "/api/items", { name: "Tag 150", number: 150 })).json().number).toBe(150);
+    expect((await call("GET", "/api/items/next-number")).json()).toEqual({ number: 151 });
+    await call("POST", "/api/items", { name: "Tag 152", number: 152 });
+    await call("POST", "/api/items", { name: "Tag 151", number: 151 });
+    // last entered is 151; 152 is taken, so the suggestion skips to 153
+    expect((await call("POST", "/api/items", { name: "Next" })).json().number).toBe(153);
+  });
+
+  it("accepts the owner's own number and refuses duplicates", async () => {
+    const { call } = await signedIn();
+    const first = (await call("POST", "/api/items", { name: "Scarf", number: 42 })).json();
+    expect(first.number).toBe(42);
+    const dup = await call("POST", "/api/items", { name: "Hat", number: 42 });
+    expect(dup.statusCode).toBe(409);
+    expect(dup.json()).toMatchObject({ code: "duplicate_number", item: { id: first.id, number: 42, name: "Scarf" } });
+    expect((await call("POST", "/api/items", { name: "X", number: 0 })).statusCode).toBe(400);
+    expect((await call("POST", "/api/items", { name: "X", number: 1_000_000 })).statusCode).toBe(400);
+  });
+
+  it("changes an item's number, guarding duplicates but allowing its own", async () => {
+    const { call } = await signedIn();
+    const a = (await call("POST", "/api/items", { name: "A", number: 10 })).json();
+    await call("POST", "/api/items", { name: "B", number: 11 });
+    expect((await call("PATCH", `/api/items/${a.id}`, { number: 11 })).statusCode).toBe(409);
+    expect((await call("PATCH", `/api/items/${a.id}`, { number: 10, name: "A2" })).statusCode).toBe(200);
+    expect((await call("PATCH", `/api/items/${a.id}`, { number: 12 })).json().number).toBe(12);
+  });
+
+  it("looks items up by number", async () => {
+    const { call } = await signedIn();
+    const a = (await call("POST", "/api/items", { name: "A", number: 77 })).json();
+    expect((await call("GET", "/api/items/by-number/77")).json().id).toBe(a.id);
+    expect((await call("GET", "/api/items/by-number/78")).statusCode).toBe(404);
+    // search matches the tag number, not the internal id
+    const hits = (await call("GET", "/api/items?q=0077")).json().items.map((i: { id: number }) => i.id);
+    expect(hits).toEqual([a.id]);
+    expect((await call("GET", `/api/items?q=${a.id}`)).json().total).toBe(0);
   });
 
   it("validates input", async () => {

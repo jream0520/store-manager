@@ -45,7 +45,8 @@ M1 is deliberately early: iOS PWA and camera behavior is the largest risk, so it
 **Goal:** A usable catalog without photos.
 - ✅ Single-user password set via CLI in the container (no web first-run, since the site is public), scrypt hashing, 90-day sliding sessions in an httpOnly cookie, CSRF header guard, login rate limiting (F27). Password change in Settings.
 - ✅ Settings: shop name, categories, currency (F28).
-- ✅ Item schema and migrations; item number = never-reused id; search by "42", "0042" or "#42" (F2).
+- ✅ Item schema and migrations; search by "42", "0042" or "#42" (F2).
+- ✅ Revised after M5: item numbers are the owner's own pre-assigned tag numbers, separate from the internal id. Editable on new, quick-add and edit screens, with a suggested default and a live duplicate check; the server refuses duplicates (migration 006).
 - ✅ Create/edit/archive item (F1); list with search, filters, sort, filters kept in the URL (F4).
 - ✅ Quick-add path; items missing price, cost or category are flagged incomplete (F7).
 - ✅ App shell: bottom tab bar, mobile-first layout, light/dark mode.
@@ -84,17 +85,19 @@ M1 is deliberately early: iOS PWA and camera behavior is the largest risk, so it
 - ✅ Discrepancies: unknown number; already sold (duplicate line or misread number, shows when and which report); not in shop (needs "Record anyway"); sold price differs from retail (flagged on the line); written-off/archived items can't be sold (F18).
 - ✅ Profit per sale uses the item's current cost; totals count sales without a cost separately. Sales tab shows this month's count, sales and profit (F21).
 - Not built: customer returns of a sold item (the reserved `Returned` status). Undo covers mistakes; a real return can be handled later if it happens.
-- ⬜ Reconcile a real report on the iPhone and time it.
+- ⬜ Reconcile a real report on the iPhone and time it. (Reconcile now looks items up by tag number.)
 
 **Done when:** a sample real report can be reconciled end-to-end in under 5 minutes and the totals match.
 
 ## M6 — Dashboard, reports, expenses
 **Goal:** See how the business is doing.
-- Dashboard: status counts, in-shop value, month and YTD sales and profit, recent activity (F23).
-- Expenses: booth rent, fees, other (F22).
-- Reports by date range and category, best sellers, average days to sell, net profit after expenses (F24).
-- Aging view (F25).
-- CSV export of items, sales, expenses (F26).
+- ✅ Dashboard at the top of the Sales tab: this month / this year sales, profit, expenses and net; stock counts and in-shop retail value; alerts for items in the shop over 60/90 days and unsold items missing details; last 10 changes (F23).
+- ✅ Expenses page: booth rent, fees, supplies, marketing, other; grouped by month; tap to edit or delete; one-tap "Rent again" (F22).
+- ✅ Profit report: presets (this month, last month, this year, last 12 months, custom); profit-and-loss summary, by-month bars, by-category table with average days to sell, top sales (F24).
+- ✅ Aging: dashboard alerts link to the In shop list, which already sorts longest-in-shop first (F25).
+- ✅ CSV export of items, sales and expenses (spreadsheet-safe: amounts as decimals, formula injection neutralized, UTF-8 BOM) (F26).
+- Decision: profit everywhere = sold price − materials cost. A sale with no cost yet counts as zero cost and is flagged ("may be high") rather than left out. Net = profit − expenses.
+- ⬜ Verify on iPhone after deploy (including CSV download from the Home Screen app).
 
 **Done when:** report numbers match a hand calculation on a test dataset.
 

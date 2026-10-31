@@ -1,13 +1,13 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import DashboardPanel from "../components/DashboardPanel.svelte";
   import { formatMoney, parseMoney } from "../lib/money";
   import { href, navigate } from "../lib/router.svelte";
-  import { createReport, listReports, listSales, type SalesList, type ShopReport } from "../lib/sales";
+  import { createReport, listReports, type ShopReport } from "../lib/sales";
   import { session } from "../lib/session.svelte";
   import { formatDay, todayLocal } from "../lib/status";
 
   let reports = $state<ShopReport[]>([]);
-  let month = $state<SalesList | null>(null);
   let loading = $state(true);
   let error = $state("");
 
@@ -21,12 +21,11 @@
   let formError = $state("");
 
   const currency = $derived(session.settings.currency);
-  const monthStart = todayLocal().slice(0, 8) + "01";
   const reportedTotalCents = $derived(parseMoney(reportedTotal));
 
   onMount(async () => {
     try {
-      [reports, month] = await Promise.all([listReports(), listSales({ from: monthStart, to: todayLocal() })]);
+      reports = await listReports();
       // Default the next report to start the day after the latest one ended.
       if (reports.length) periodStart = nextDay(reports[0].periodEnd);
     } catch (e) {
@@ -72,18 +71,9 @@
   }
 </script>
 
-<h1>Sales</h1>
+<h1>Sales & profit</h1>
 
-{#if month}
-  <div class="card stats">
-    <div><span class="muted">This month</span><strong>{month.count}</strong><span class="muted">sold</span></div>
-    <div><span class="muted">Sales</span><strong>{formatMoney(month.totalCents, currency)}</strong></div>
-    <div>
-      <span class="muted">Profit</span><strong>{formatMoney(month.profitCents, currency)}</strong>
-      {#if month.missingCostCount}<span class="muted tiny">{month.missingCostCount} missing cost</span>{/if}
-    </div>
-  </div>
-{/if}
+<DashboardPanel />
 
 <div class="row head">
   <h2 class="grow">Shop reports</h2>
@@ -153,23 +143,6 @@
 </ul>
 
 <style>
-  .stats {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    text-align: center;
-  }
-  .stats div {
-    display: flex;
-    flex-direction: column;
-  }
-  .stats strong {
-    font-size: 20px;
-    font-variant-numeric: tabular-nums;
-  }
-  .stats .muted {
-    font-size: 13px;
-  }
   .tiny {
     font-size: 11px !important;
   }

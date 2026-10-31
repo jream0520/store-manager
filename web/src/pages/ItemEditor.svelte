@@ -1,10 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import NumberField from "../components/NumberField.svelte";
   import PhotoManager, { type PendingPhoto } from "../components/PhotoManager.svelte";
   import SellDialog from "../components/SellDialog.svelte";
   import StatusDialog from "../components/StatusDialog.svelte";
   import { getSale, undoSale, type Sale } from "../lib/sales";
-  import { get, patch, post } from "../lib/api";
+  import { ApiError, get, patch, post } from "../lib/api";
   import { centsToInput, formatMoney, parseMoney } from "../lib/money";
   import { uploadPending } from "../lib/photos";
   import { href, navigate } from "../lib/router.svelte";
@@ -19,6 +20,9 @@
   let loading = $state(true);
   let notFound = $state(false);
 
+  let numberText = $state("");
+  let numberOk = $state(true);
+  let numberField = $state<ReturnType<typeof NumberField>>();
   let name = $state("");
   let price = $state("");
   let cost = $state("");
@@ -42,7 +46,7 @@
   const priceCents = $derived(parseMoney(price));
   const costCents = $derived(parseMoney(cost));
   const nameOk = $derived(name.trim().length > 0);
-  const valid = $derived(nameOk && priceCents !== undefined && costCents !== undefined);
+  const valid = $derived(nameOk && numberOk && priceCents !== undefined && costCents !== undefined);
   const profit = $derived(
     typeof priceCents === "number" && typeof costCents === "number" ? priceCents - costCents : null,
   );
@@ -55,6 +59,7 @@
         id ? get<Item>(`/items/${id}`) : Promise.resolve(null),
       ]);
       categories = cats;
+      if (!id) numberText = String((await get<{ number: number }>("/items/next-number")).number);
       if (existing) {
         fill(existing);
         loadHistory();
@@ -71,6 +76,7 @@
 
   function fill(it: Item) {
     item = it;
+    numberText = String(it.number);
     name = it.name;
     price = centsToInput(it.priceCents);
     cost = centsToInput(it.costCents);
@@ -105,6 +111,7 @@
     busy = true;
     error = "";
     const body = {
+      number: Number(numberText.trim().replace("#", "")),
       name: name.trim(),
       priceCents,
       costCents,
@@ -128,7 +135,12 @@
         navigate(`/items/${created.id}?created=1${failed ? `&failed=${failed}` : ""}`, { replace: true });
       }
     } catch (err) {
-      error = (err as Error).message;
+      if (err instanceof ApiError && err.data.code === "duplicate_number") {
+        numberField?.markTaken(err.data.item as Item);
+        error = "That tag number is already used.";
+      } else {
+        error = (err as Error).message;
+      }
     } finally {
       busy = false;
     }
@@ -289,6 +301,8 @@
   {/if}
 
   <form onsubmit={save} novalidate>
+    <NumberField bind:this={numberField} bind:value={numberText} bind:ok={numberOk} itemId={item?.id} />
+
     <label for="name">Name</label>
     <input id="name" bind:value={name} maxlength="120" aria-invalid={tried && !nameOk} autocomplete="off" />
     {#if tried && !nameOk}<p class="error">Name is required.</p>{/if}

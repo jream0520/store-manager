@@ -32,6 +32,7 @@ export interface Sale {
 interface SaleRow {
   id: number;
   item_id: number;
+  item_number: number;
   item_name: string;
   cover_photo_id: string | null;
   sale_date: string;
@@ -44,7 +45,7 @@ interface SaleRow {
   created_at: string;
 }
 
-const SALE_SELECT = `SELECT s.*, i.name AS item_name, i.cost_cents,
+const SALE_SELECT = `SELECT s.*, i.number AS item_number, i.name AS item_name, i.cost_cents,
   (SELECT p.id FROM photos p WHERE p.item_id = i.id ORDER BY p.sort_order, p.created_at LIMIT 1) AS cover_photo_id
   FROM sales s JOIN items i ON i.id = s.item_id`;
 
@@ -52,7 +53,7 @@ function toSale(r: SaleRow): Sale {
   return {
     id: r.id,
     itemId: r.item_id,
-    itemNumber: r.item_id,
+    itemNumber: r.item_number,
     itemName: r.item_name,
     coverPhotoId: r.cover_photo_id,
     saleDate: r.sale_date,
@@ -340,13 +341,13 @@ export function salesRoutes(db: Database.Database) {
           .prepare(`${SALE_SELECT} ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY s.sale_date DESC, s.id DESC`)
           .all(...params) as SaleRow[];
         const sales = rows.map(toSale);
-        const withCost = sales.filter((s) => s.profitCents !== null);
+        // Same rule as insights.ts: a missing cost counts as zero and is reported, not skipped.
         return {
           sales,
           count: sales.length,
           totalCents: sales.reduce((n, s) => n + s.soldCents, 0),
-          profitCents: withCost.reduce((n, s) => n + s.profitCents!, 0),
-          missingCostCount: sales.length - withCost.length,
+          profitCents: sales.reduce((n, s) => n + s.soldCents - (s.costCents ?? 0), 0),
+          missingCostCount: sales.filter((s) => s.costCents === null).length,
         };
       },
     );

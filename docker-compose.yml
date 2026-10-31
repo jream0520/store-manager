@@ -1,29 +1,12 @@
 services:
   app:
     build: .
+    image: store-manager:latest
     restart: unless-stopped
     volumes:
       - ./data:/data
-    expose:
-      - "3000"
-
-  # Terminates HTTPS (required for iOS camera + PWA install). Remove this service
-  # and point your existing reverse proxy at app:3000 if you already have one.
-  caddy:
-    image: caddy:2
-    restart: unless-stopped
-    depends_on:
-      - app
+    # Plain HTTP on loopback only; the host's existing TLS reverse proxy forwards to it.
+    # If the proxy itself runs in Docker, remove `ports` and attach this service to the
+    # proxy's network instead (see README).
     ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-
-volumes:
-  caddy_data:
-  caddy_config:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"

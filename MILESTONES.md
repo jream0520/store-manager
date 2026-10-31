@@ -6,7 +6,7 @@ Derived from PRD.md (approved 2026-10-30). Each milestone ends with something ru
 
 | # | Milestone | Outcome | PRD items |
 |---|---|---|---|
-| M0 | Foundations and tech decisions | Repo, stack chosen, container builds and serves hello-world over HTTPS | §9 |
+| M0 | Foundations and tech decisions | Repo, stack chosen, container builds and serves hello-world over HTTPS via the existing proxy | §9, §12 |
 | M1 | Device and deploy spike | PWA installs on iPhone, camera capture uploads a photo to the server | F8, F27 (partial) |
 | M2 | Auth and item core | Log in, create/edit/list/search items | F1–F4, F27, F28 |
 | M3 | Photos | Multi-photo items, thumbnails, cover photo | F8–F10 |
@@ -22,14 +22,14 @@ M1 is deliberately early: iOS PWA and camera behavior is the largest risk, so it
 
 ## M0 — Foundations and tech decisions
 **Goal:** Settle open questions and have a working skeleton.
-- Resolve PRD §12 open questions that affect design (payouts, item numbers/QR, domain/proxy, import of existing inventory, cost model).
-- Choose the stack (backend language/framework, SQLite access layer and migrations, front-end framework).
-- Repo structure, linting, formatting, test runner, CI-ready scripts.
-- Dockerfile (multi-stage) and `docker-compose.yml` with a volume for `/data`.
-- Reverse proxy and TLS plan: bundled Caddy or the existing proxy on the host.
-- Health endpoint, config via environment variables, structured logging.
+- ✅ Resolve PRD §12 open questions (see PRD §12).
+- ✅ Choose the stack (ADR 0001).
+- ✅ Repo structure, test runner, build scripts.
+- ✅ Dockerfile (multi-stage) and `docker-compose.yml` with a volume for `/data`; image verified locally.
+- ✅ Health endpoint, config via environment variables, structured logging.
+- ⬜ Route the host's existing reverse proxy to the container (README snippets) and deploy.
 
-**Done when:** `docker compose up` on the host serves a placeholder page at `https://<your-domain>` with a valid certificate.
+**Done when:** `docker compose up` on the host serves the placeholder page at `https://<your-domain>` through the existing proxy.
 
 ## M1 — Device and deploy spike
 **Goal:** Retire the iOS risk.
@@ -44,7 +44,7 @@ M1 is deliberately early: iOS PWA and camera behavior is the largest risk, so it
 **Goal:** A usable catalog without photos.
 - Single-user setup (first-run password creation or env-seeded), login, long-lived secure session, login rate limiting (F27).
 - Settings: shop name, categories, currency (F28).
-- Item schema and migrations; auto-numbering (F2).
+- Item schema and migrations; short sequential item numbers that are never reused, with lookup that ignores leading zeros (F2).
 - Create/edit/archive item (F1); list with search, filters, sort (F4).
 - Quick-add path with the "incomplete" flag (F7).
 - App shell: navigation, mobile-first layout, light/dark mode.
@@ -74,8 +74,8 @@ M1 is deliberately early: iOS PWA and camera behavior is the largest risk, so it
 **Goal:** The core workflow: shop report → recorded sales.
 - Mark sold with date and price, defaulting to retail; edit and undo (F15).
 - ShopReport records (period, received date, reported total).
-- Reconciliation flow: select report period, step through in-shop items, mark sold, running count and total versus the reported total (F16, F17).
-- Discrepancy flags: sold item not in shop, price differs from retail, duplicate (F18).
+- Reconciliation flow: create a report period, enter sold items by item number (number pad → photo and price shown → confirm → next), with the in-shop list as a fallback; running count and total versus the reported total (F16, F17).
+- Discrepancy flags: unknown item number, sold item not in shop, price differs from retail, duplicate (F18).
 - Profit per item (F21).
 
 **Done when:** a sample real report can be reconciled end-to-end in under 5 minutes and the totals match.
@@ -95,18 +95,17 @@ M1 is deliberately early: iOS PWA and camera behavior is the largest risk, so it
 - Backup: scheduled snapshot or a built-in full export of the DB and photos (F29); a tested restore procedure and a restore-drill test.
 - Audit log (F30).
 - Security review: headers, cookie flags, rate limits, dependency audit, optional network restriction guide.
-- Import of existing inventory (CSV/spreadsheet) if you have one, one-time.
-- Setup and operations docs: install, HTTPS, upgrade, backup, restore.
+- Setup and operations docs: install, reverse-proxy setup, upgrade, backup, restore.
 - Real-device regression pass on iPhone and iPad; performance check with a large dataset.
 - Tag v1.0.
 
 **Done when:** a fresh host can be restored from a backup into an identical working state, and you are running real inventory on it.
 
 ## M8 — Post-v1 backlog (not committed)
-- CSV or spreadsheet import of the shop's report (F19); attach the original report file (F20).
+- CSV or spreadsheet import of the shop's report, matching by item number (F19); attach the original report file (F20).
 - QR labels and scan-to-open; label printing.
-- Passkey login; payout tracking if you want it.
-- Multi-shop UI; offline mode.
+- Passkey login.
+- Offline mode.
 
 ---
 

@@ -1,6 +1,6 @@
 # Store Manager — Product Requirements Document
 
-Status: **DRAFT v0.1 — awaiting approval**
+Status: **APPROVED v1.1** — open questions resolved (see §12)
 Date: 2026-10-30
 
 ## 1. Overview
@@ -13,13 +13,17 @@ It runs as one Docker container on the owner's hosted server and is used from an
 
 | Topic | Decision |
 |---|---|
-| Users | One user (the owner). Single login, no roles. |
-| Shops | One shop. The data model keeps a `shop` record so more can be added later without a rewrite. |
-| Business model | Booth/space rental. The owner keeps sale proceeds. Payments are taken by the shop; the app does **not** process payments. |
-| Inventory | Mostly unique, one-of-a-kind pieces. Each item is its own record (quantity = 1). |
-| Sales intake | The shop sends periodic reports (email/PDF/spreadsheet). The owner enters sales into the app by hand. |
-| Financials | Retail price, sold price, sale date, and materials cost, giving profit per item. |
+| Users | One user (the owner). Single login, no roles. Stays solo. |
+| Shops | One shop. The data model keeps a `shop` record, but no multi-shop UI is planned. |
+| Business model | Booth/space rental. The owner keeps sale proceeds. Payments are taken by the shop, which pays the owner; the app does **not** process payments or track payouts. |
+| Sales tax | Collected and remitted by the shop. The app ignores tax. |
+| Inventory | Mostly unique, one-of-a-kind pieces. Each item is its own record (quantity = 1). Small scale: under a few hundred items/year, 1–3 photos each. |
+| Physical tags | Hand-written price tags. The owner writes the app's item number on each tag. |
+| Sales intake | The shop sends periodic reports (email/PDF/spreadsheet) that identify each sale **by the owner's item number**. The owner enters sales by hand. |
+| Financials | Retail price, sold price, sale date, and a single materials-cost total per item, giving profit per item. |
+| Existing data | None to import; the few current items are entered by hand. |
 | Connectivity | Reliable, online-only. No offline mode in v1. |
+| Hosting | The owner's server already runs a TLS reverse proxy; the app container sits behind it. |
 | Client | PWA on iOS Safari, added to the Home Screen. |
 
 ## 3. Goals and non-goals
@@ -56,7 +60,7 @@ Priority: **P0** = must for v1, **P1** = should for v1, **P2** = later.
 
 ### 5.1 Items
 - **F1 (P0)** Create/edit/archive an item with: name, description, category, tags, materials cost, retail price, status, optional SKU/tag number, notes.
-- **F2 (P0)** Auto-generated short item number (e.g. `0042`) that can be written on a price tag.
+- **F2 (P0)** Auto-generated short, sequential numeric item number (e.g. `42`, displayed `0042`) that is easy to hand-write on a price tag and is shown prominently on the item screen. Numbers are never reused. Lookup ignores leading zeros.
 - **F3 (P0)** Status lifecycle: `In studio` → `In shop` → `Sold`. Also `Returned` and `Written off` (lost/damaged/gifted). Every status change is timestamped.
 - **F4 (P0)** List view with thumbnail, price, status. Search by name/number/tag; filter by status and category; sort by date, price.
 - **F5 (P1)** Price history (each change is logged with date).
@@ -76,10 +80,10 @@ Priority: **P0** = must for v1, **P1** = should for v1, **P2** = later.
 
 ### 5.4 Sales and reconciliation
 - **F15 (P0)** Mark an item sold: sale date, sold price (defaults to retail price), optional note. Editable and undoable.
-- **F16 (P0)** **Reconcile a shop report**: choose a report period, then work through the "In shop" list marking sold items quickly (tap, confirm price/date). Each sale can be tagged with a report reference/period.
+- **F16 (P0)** **Reconcile a shop report**: create a report period, then enter each sold item **by item number** (number pad → item shown with photo and retail price → confirm sold price/date → next). Picking from the "In shop" list is the fallback. Each sale is linked to the report.
 - **F17 (P1)** Running reconciliation checklist: items sold since the last report period, so nothing is missed. Shows the count and total sold price to compare against the shop's report total.
-- **F18 (P1)** Detect discrepancies: a sold item not in the shop, a sold price differing from retail, a duplicate sale.
-- **F19 (P2)** CSV import of a shop's spreadsheet report, with matching by item number or name.
+- **F18 (P1)** Detect discrepancies: an unknown item number, a sold item not in the shop, a sold price differing from retail, a duplicate sale.
+- **F19 (P2)** CSV import of a shop's spreadsheet report, matching by item number.
 - **F20 (P2)** Attach the shop's original report file (PDF/XLSX) to a report period for reference.
 
 ### 5.5 Costs and profit
@@ -94,7 +98,7 @@ Priority: **P0** = must for v1, **P1** = should for v1, **P2** = later.
 
 ### 5.7 Administration
 - **F27 (P0)** Single-user login (password, plus an optional passkey later), long-lived session so the phone stays signed in.
-- **F28 (P0)** Settings: shop name, categories, currency, optional sales-tax note.
+- **F28 (P0)** Settings: shop name, categories, currency.
 - **F29 (P1)** Full data export (database plus photos zip) and a restore procedure.
 - **F30 (P1)** Audit log of edits (what changed, when).
 
@@ -124,7 +128,7 @@ Priority: **P0** = must for v1, **P1** = should for v1, **P2** = later.
 ## 8. Non-functional requirements
 
 - **Deployment**: one Docker image, run via `docker compose`. Configuration by environment variables. Persistent volumes for the database and photos.
-- **HTTPS**: required for the iOS camera and PWA install. Either terminate TLS in a reverse proxy (Caddy/Traefik/nginx, or the one already on the host) or bundle Caddy in the compose file for automatic certificates. The app needs a hostname/domain.
+- **HTTPS**: required for the iOS camera and PWA install. TLS is terminated by the reverse proxy already running on the host; the container listens on plain HTTP and is not exposed publicly on its own.
 - **Storage**: SQLite on a volume (a single user does not need a database server) and photos on the filesystem.
 - **Backups**: documented, tested backup of the DB and photos (scheduled snapshot or a built-in export), with a restore procedure.
 - **Security**: login required for everything, secure session cookies, rate-limited login, no public registration. Optional network restriction (VPN/IP allowlist) is documented.
@@ -152,23 +156,25 @@ Priority: **P0** = must for v1, **P1** = should for v1, **P2** = later.
 | Risk | Mitigation |
 |---|---|
 | iOS PWA quirks (camera, storage eviction, no push) | Test on a real device early (M1); the server is the source of truth. |
-| HTTPS/domain setup is the hardest part of "just a container" | Provide a compose file with bundled Caddy and a clear setup guide. |
-| Photo storage growth | Downscale on upload; thumbnails; document storage size. |
+| Proxy misconfiguration (upload size limits, forwarded headers) | Document nginx/Caddy/Traefik snippets, including body-size limits for photo uploads. |
+| Hand-written item numbers misread by the shop | Short numeric numbers; reconcile shows the photo before confirming; unknown-number flag (F18). |
+| Photo storage growth | Low at expected scale; downscale on upload and generate thumbnails anyway. |
 | Data loss on a self-hosted box | Built-in export plus a documented backup. |
 | Scope creep toward POS | Non-goals above; revisit after v1. |
 
-## 12. Open questions (please confirm or correct)
+## 12. Resolved decisions (2026-10-30)
 
-1. **Booth rent, card fees, and payouts**: does the shop send you the sale money (minus fees) or do you collect it yourself? Does it come as a check or deposit that you'd want to log against a report period? (F22 and F16 assume you track expenses only; payouts as an "amount received" field are easy to add.)
-2. **Sales tax**: does the shop collect and remit it, so you can ignore it? Assumed yes.
-3. **Item numbers and tags**: do you put a number or QR code on each piece's tag? Printing labels, or scanning a QR with the phone camera to jump to an item, is a possible P2 feature.
-4. **Does the shop's report identify items** by your item number, by name, or only by description and price? This affects how useful CSV import (F19) is.
-5. **Domain and reverse proxy**: do you already have a domain and TLS proxy on the host, or should the compose file include one?
-6. **Existing inventory**: do you have a spreadsheet to import at the start?
-7. **Photo volume**: roughly how many items and photos per item (to size storage)?
-8. **Materials cost**: a single total per item, or a list of materials with costs? Assumed a single number in v1.
-9. **Future**: any chance of a second shop or a helper using it? The model allows for it, but the UI will not.
+| Question | Answer | Effect |
+|---|---|---|
+| Payouts | Shop pays the owner; no tracking needed | No payout entity. Expenses (F22) stay optional. |
+| Sales tax | Shop handles it | No tax fields. |
+| Item tags | Hand-written price tags | F2: short numeric item numbers. QR labels stay P2. |
+| Report identifies items by | The owner's item number | F16: enter-by-number reconcile flow. F19 import becomes simple. |
+| HTTPS | Existing reverse proxy on the host | Bundled Caddy removed; proxy snippets in README. |
+| Existing inventory | Few items, entered by hand | No import feature. |
+| Materials cost | Single total per item | Confirmed as in F21. |
+| Scale and growth | Small, stays solo | No multi-user or multi-shop work planned. |
 
 ## 13. Out of scope for v1 (parking lot)
 
-Offline mode, QR/barcode scanning and label printing, shop-facing login, multi-shop UI, CSV/PDF report import, online storefront, payments, tax reports, inventory forecasting.
+Offline mode, QR/barcode scanning and label printing, shop-facing login, multi-shop UI, CSV/PDF report import, payout tracking, online storefront, payments, tax reports, inventory forecasting.

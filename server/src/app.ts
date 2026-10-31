@@ -5,7 +5,8 @@ import type Database from "better-sqlite3";
 import type { Config } from "./config.js";
 
 export function buildApp(config: Config, db: Database.Database) {
-  const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
+  // Runs behind the host's TLS reverse proxy; trust its X-Forwarded-* headers.
+  const app = Fastify({ logger: process.env.NODE_ENV !== "test", trustProxy: true });
 
   app.get("/api/health", async () => {
     const row = db.prepare("SELECT COUNT(*) AS n FROM schema_migrations").get() as { n: number };

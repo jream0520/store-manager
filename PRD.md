@@ -69,7 +69,7 @@ Priority: **P0** = must for v1, **P1** = should for v1, **P2** = later.
 
 ### 5.2 Photos (bonus feature, in v1 scope)
 - **F8 (P0)** Take a photo with the device camera or pick from the library, attached to an item. Multiple photos per item; one is the cover.
-- **F9 (P0)** The client downsizes images before upload (e.g. max 2000px, JPEG). The server stores the original-ish copy plus a thumbnail. Handles iPhone HEIC/orientation correctly.
+- **F9 (P0)** The client downsizes images before upload (e.g. max 2000px, JPEG). The client also makes the thumbnail; the server validates and stores both (no image processing on the server). Handles iPhone HEIC/orientation correctly.
 - **F10 (P1)** Reorder, delete, and set the cover photo.
 - **F11 (P2)** Camera-first "new item" flow.
 

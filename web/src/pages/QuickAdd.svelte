@@ -1,16 +1,21 @@
 <script lang="ts">
+  import PhotoManager, { type PendingPhoto } from "../components/PhotoManager.svelte";
   import { post } from "../lib/api";
+  import { uploadPending } from "../lib/photos";
   import { formatMoney, parseMoney } from "../lib/money";
   import { href } from "../lib/router.svelte";
   import { session } from "../lib/session.svelte";
   import { itemNumber, type Item } from "../lib/types";
 
-  // PRD F7: capture just a name and price now; fill in cost/category later (flagged incomplete).
+  // PRD F7: capture a photo, name and price now; fill in cost/category later (flagged incomplete).
   let name = $state("");
   let price = $state("");
   let busy = $state(false);
   let error = $state("");
-  let added = $state<Item[]>([]);
+  let added = $state<(Item & { hasPhoto: boolean; photoFailed: boolean })[]>([]);
+  let pending = $state<PendingPhoto[]>([]);
+  // Remounts the photo picker after each add so it starts empty.
+  let round = $state(0);
   let nameEl = $state<HTMLInputElement>();
 
   const priceCents = $derived(parseMoney(price));
@@ -23,7 +28,11 @@
     error = "";
     try {
       const item = await post<Item>("/items", { name: name.trim(), priceCents });
-      added = [item, ...added];
+      const hadPhoto = pending.length > 0;
+      const photoFailed = (await uploadPending(item.id, pending)) > 0;
+      pending = [];
+      round++;
+      added = [{ ...item, hasPhoto: hadPhoto && !photoFailed, photoFailed }, ...added];
       name = "";
       price = "";
       nameEl?.focus();
@@ -37,7 +46,9 @@
 
 <p><a href={href("/")}>‹ Items</a></p>
 <h1>Quick add</h1>
-<p class="muted">Name and price now; add cost and category later.</p>
+<p class="muted">Photo, name and price now; add cost and category later.</p>
+
+{#key round}<PhotoManager bind:pending max={1} />{/key}
 
 <form onsubmit={submit} novalidate>
   <label for="qa-name">Name</label>
@@ -56,6 +67,7 @@
     {#each added as it (it.id)}
       <li>
         <a href={href(`/items/${it.id}`)}><strong>{itemNumber(it.number)}</strong> {it.name}</a>
+        {#if it.photoFailed}<span class="error">photo failed</span>{:else if it.hasPhoto}<span class="muted">📷</span>{/if}
         <span class="muted">{formatMoney(it.priceCents, session.settings.currency)}</span>
       </li>
     {/each}

@@ -1,9 +1,12 @@
-export interface ResizedImage {
-  blob: Blob;
+export const FULL_MAX = 2000;
+export const THUMB_MAX = 480;
+
+export interface ProcessedPhoto {
+  full: Blob;
+  thumb: Blob;
   width: number;
   height: number;
-  sourceWidth: number;
-  sourceHeight: number;
+  sourceBytes: number;
 }
 
 /** Scales (w, h) down to fit within max on the long edge; never scales up. */
@@ -14,15 +17,20 @@ export function fitWithin(w: number, h: number, max: number): { width: number; h
 
 /**
  * Decodes any image the browser can display (including iPhone HEIC on Safari), applies its
- * EXIF orientation, and re-encodes it as a JPEG no larger than `max` px on the long edge.
+ * EXIF orientation, and produces the upload pair: a JPEG ≤ 2000 px and a ≤ 480 px thumbnail.
+ * The server stores these as-is, so all image work happens here on the phone.
  */
-export async function resizeToJpeg(file: Blob, max = 2000, quality = 0.85): Promise<ResizedImage> {
+export async function processPhoto(file: Blob): Promise<ProcessedPhoto> {
   const img = await loadImage(file);
   // naturalWidth/Height already reflect EXIF orientation (CSS image-orientation: from-image).
-  const sourceWidth = img.naturalWidth;
-  const sourceHeight = img.naturalHeight;
-  const { width, height } = fitWithin(sourceWidth, sourceHeight, max);
+  const size = fitWithin(img.naturalWidth, img.naturalHeight, FULL_MAX);
+  const full = await encode(img, size.width, size.height, 0.85);
+  const t = fitWithin(img.naturalWidth, img.naturalHeight, THUMB_MAX);
+  const thumb = await encode(img, t.width, t.height, 0.8);
+  return { full, thumb, width: size.width, height: size.height, sourceBytes: file.size };
+}
 
+async function encode(img: HTMLImageElement, width: number, height: number, quality: number): Promise<Blob> {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -30,10 +38,11 @@ export async function resizeToJpeg(file: Blob, max = 2000, quality = 0.85): Prom
   if (!ctx) throw new Error("Canvas 2D is not available");
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(img, 0, 0, width, height);
-
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+  // Free the canvas backing store promptly; iOS caps total canvas memory.
+  canvas.width = canvas.height = 0;
   if (!blob) throw new Error("Could not encode JPEG");
-  return { blob, width, height, sourceWidth, sourceHeight };
+  return blob;
 }
 
 async function loadImage(file: Blob): Promise<HTMLImageElement> {

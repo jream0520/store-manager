@@ -19,5 +19,5 @@ Status: proposed (M0), 2026-10-30
 - The production server (Pentium G2020T) has no AVX. The front-end build tools crash there with "Illegal instruction", so the image is built on the dev machine and shipped with `deploy.ps1`. The Node runtime and better-sqlite3 run fine on it.
 - The app is served under a path prefix (`/store/`) because the host has a single DDNS hostname. `BASE_PATH` is a build-time setting for the web client only; the proxy strips the prefix, so the server is unaware of it.
 - `npm audit` flags build-time-only issues via workbox-build (dev dependency, not shipped in the image).
-- Photo resizing happens on the client (canvas); server thumbnails will use `sharp` in M3.
-- iOS needs a PNG `apple-touch-icon`; the SVG icon is a placeholder until M1.
+- All image work happens on the phone (canvas): it decodes the photo once (including HEIC and EXIF rotation) and uploads a ≤ 2000 px JPEG plus a ≤ 480 px thumbnail. The server only validates JPEG structure and dimensions (`server/src/jpeg.ts`) and stores both files. This avoids a native image library (`sharp`/libvips) on the old server CPU and keeps the server's CPU load near zero. Trade-off: the server can't re-generate thumbnails in other sizes; a later one-off script could do that from the full images if needed.
+- iOS needs a PNG `apple-touch-icon`; PNG icons are rendered from `web/public/icon.svg` with `npm run icons` (dev machine only) and committed.

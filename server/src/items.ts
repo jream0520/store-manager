@@ -13,6 +13,9 @@ export interface Item {
   description: string;
   categoryId: number | null;
   categoryName: string | null;
+  /** First photo by sort order; its thumbnail is shown in lists (M3). */
+  coverPhotoId: string | null;
+  photoCount: number;
   tags: string[];
   costCents: number | null;
   priceCents: number | null;
@@ -31,6 +34,8 @@ interface ItemRow {
   description: string;
   category_id: number | null;
   category_name: string | null;
+  cover_photo_id: string | null;
+  photo_count: number;
   tags: string;
   cost_cents: number | null;
   price_cents: number | null;
@@ -71,7 +76,10 @@ const SORTS = {
   price_desc: "i.price_cents IS NULL, i.price_cents DESC, i.id DESC",
 } as const;
 
-const SELECT = `SELECT i.*, c.name AS category_name FROM items i LEFT JOIN categories c ON c.id = i.category_id`;
+const COLUMNS = `i.*, c.name AS category_name,
+  (SELECT p.id FROM photos p WHERE p.item_id = i.id ORDER BY p.sort_order, p.created_at LIMIT 1) AS cover_photo_id,
+  (SELECT COUNT(*) FROM photos p WHERE p.item_id = i.id) AS photo_count`;
+const SELECT = `SELECT ${COLUMNS} FROM items i LEFT JOIN categories c ON c.id = i.category_id`;
 const INCOMPLETE_SQL = "(i.price_cents IS NULL OR i.cost_cents IS NULL OR i.category_id IS NULL)";
 
 function toItem(r: ItemRow): Item {
@@ -82,6 +90,8 @@ function toItem(r: ItemRow): Item {
     description: r.description,
     categoryId: r.category_id,
     categoryName: r.category_name,
+    coverPhotoId: r.cover_photo_id,
+    photoCount: r.photo_count,
     tags: JSON.parse(r.tags),
     costCents: r.cost_cents,
     priceCents: r.price_cents,
@@ -156,7 +166,7 @@ export function listItems(db: Database.Database, q: ListQuery): { items: Item[];
   const total = (db.prepare(`SELECT COUNT(*) AS n ${from}`).get(...params) as { n: number }).n;
   const order = SORTS[q.sort ?? "newest"] ?? SORTS.newest;
   const rows = db
-    .prepare(`SELECT i.*, c.name AS category_name ${from} ORDER BY ${order} LIMIT ? OFFSET ?`)
+    .prepare(`SELECT ${COLUMNS} ${from} ORDER BY ${order} LIMIT ? OFFSET ?`)
     .all(...params, q.limit ?? 100, q.offset ?? 0) as ItemRow[];
   return { items: rows.map(toItem), total };
 }

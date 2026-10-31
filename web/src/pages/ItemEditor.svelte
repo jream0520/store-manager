@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import PhotoManager, { type PendingPhoto } from "../components/PhotoManager.svelte";
   import { get, patch, post } from "../lib/api";
   import { centsToInput, formatMoney, parseMoney } from "../lib/money";
+  import { uploadPending } from "../lib/photos";
   import { href, navigate } from "../lib/router.svelte";
   import { session } from "../lib/session.svelte";
   import { itemNumber, STATUS_LABELS, type Category, type Item } from "../lib/types";
@@ -22,6 +24,8 @@
   let notes = $state("");
 
   let busy = $state(false);
+  let busyLabel = $state("");
+  let pendingPhotos = $state<PendingPhoto[]>([]);
   let error = $state("");
   let saved = $state(false);
   let tried = $state(false);
@@ -101,8 +105,13 @@
         fill(await patch<Item>(`/items/${item.id}`, body));
         flashSaved();
       } else {
+        busyLabel = "Saving…";
         const created = await post<Item>("/items", body);
-        navigate(`/items/${created.id}?created=1`, { replace: true });
+        const failed = await uploadPending(created.id, pendingPhotos, (done, total) => {
+          busyLabel = `Uploading photo ${done + 1} of ${total}…`;
+        });
+        pendingPhotos = [];
+        navigate(`/items/${created.id}?created=1${failed ? `&failed=${failed}` : ""}`, { replace: true });
       }
     } catch (err) {
       error = (err as Error).message;
@@ -129,6 +138,11 @@
   }
 
   const justCreated = new URLSearchParams(location.search).get("created") === "1";
+  const failedUploads = Number(new URLSearchParams(location.search).get("failed") ?? 0);
+
+  async function refreshItem() {
+    if (item) item = await get<Item>(`/items/${item.id}`);
+  }
 </script>
 
 <p><a href={href("/")} onclick={(e) => { if (history.length > 1 && !justCreated) { e.preventDefault(); history.back(); } }}>‹ Items</a></p>
@@ -147,8 +161,11 @@
       {#if item.archived}<span class="badge">Archived</span>{/if}
     </div>
     {#if justCreated}<p class="created card">Saved. Write <strong>{itemNumber(item.number)}</strong> on the price tag.</p>{/if}
+    {#if failedUploads}<p class="error">{failedUploads} photo{failedUploads === 1 ? "" : "s"} didn't upload. Add {failedUploads === 1 ? "it" : "them"} again below.</p>{/if}
+    <PhotoManager itemId={item.id} onchange={refreshItem} />
   {:else}
     <h1>New item</h1>
+    <PhotoManager bind:pending={pendingPhotos} />
   {/if}
 
   <form onsubmit={save} novalidate>
@@ -192,7 +209,7 @@
 
     <div class="actions row">
       <button class="primary grow" type="submit" disabled={busy}>
-        {busy ? "Saving…" : saved ? "Saved ✓" : item ? "Save changes" : "Create item"}
+        {busy ? busyLabel || "Saving…" : saved ? "Saved ✓" : item ? "Save changes" : "Create item"}
       </button>
     </div>
   </form>

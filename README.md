@@ -36,7 +36,7 @@ cd ~/store-manager && cp .env.example .env    # then set APP_BIND / APP_PORT
 ```
 This builds the image, writes it to a file, copies it and `docker-compose.yml` to the server, then loads it, restarts the container, and runs a health check. Don't pipe `docker save` through PowerShell, which corrupts the tar.
 
-Then open `https://<your-hostname><BASE_PATH>` on the phone and choose Share → Add to Home Screen. All data lives in `./data` on the server (back it up).
+Then open `https://<your-hostname><BASE_PATH>` on the phone and choose Share → Add to Home Screen. All data lives in `./data` on the server: `store.db` plus `photos/`. Back up the whole folder.
 
 ### Set or reset the password
 

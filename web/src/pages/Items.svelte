@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { get } from "../lib/api";
   import { formatMoney } from "../lib/money";
+  import { photoUrl } from "../lib/photos";
   import { href, navigate, route } from "../lib/router.svelte";
   import { session } from "../lib/session.svelte";
   import { itemNumber, STATUS_LABELS, type Category, type Item, type ItemList, type Status } from "../lib/types";
@@ -148,9 +149,13 @@
   {#each items as item (item.id)}
     <li>
       <a href={href(`/items/${item.id}`)}>
-        <span class="num">{itemNumber(item.number)}</span>
+        {#if item.coverPhotoId}
+          <img class="thumb" src={photoUrl(item.coverPhotoId, "thumb")} alt="" loading="lazy" width="52" height="52" />
+        {:else}
+          <span class="thumb none" aria-hidden="true"></span>
+        {/if}
         <span class="main">
-          <span class="name">{item.name}</span>
+          <span class="name"><span class="num">{itemNumber(item.number)}</span> {item.name}</span>
           <span class="meta">
             {item.categoryName ?? "Uncategorized"}
             {#if item.status !== "in_studio"}· {STATUS_LABELS[item.status as Status]}{/if}
@@ -228,17 +233,25 @@
     display: flex;
     gap: 12px;
     align-items: center;
-    padding: 12px 0;
+    padding: 8px 0;
     border-bottom: 1px solid var(--border);
     color: inherit;
     text-decoration: none;
     min-height: 56px;
   }
+  .thumb {
+    width: 52px;
+    height: 52px;
+    flex: none;
+    border-radius: 8px;
+    object-fit: cover;
+    background: var(--surface);
+  }
   .num {
     font-variant-numeric: tabular-nums;
     font-weight: 600;
     color: var(--muted);
-    min-width: 3.2em;
+    margin-right: 4px;
   }
   .main {
     flex: 1;

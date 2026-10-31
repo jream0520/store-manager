@@ -50,16 +50,17 @@ M1 is deliberately early: iOS PWA and camera behavior is the largest risk, so it
 - ✅ Quick-add path; items missing price, cost or category are flagged incomplete (F7).
 - ✅ App shell: bottom tab bar, mobile-first layout, light/dark mode.
 - ✅ M1 photo spike endpoints and page removed; the resize code is kept for M3.
-- ⬜ Verify on iPhone after deploy.
+- ✅ Verified on iPhone after deploy (2026-10-31).
 
 **Done when:** you can sign in from your phone and add, find, and edit items. Unit and API tests cover the item lifecycle.
 
 ## M3 — Photos
 **Goal:** Photo-driven item entry.
-- Photo attach to items: multiple per item, cover photo, reorder, delete (F8, F10).
-- Server thumbnails and lazy-loaded thumbs in lists (F9).
-- Camera-first new-item flow (F11 if time allows; otherwise M8).
-- Storage layout on the volume, orphan cleanup, size limits.
+- ✅ Photos on items: up to 12 per item, camera or library (multi-select), first photo is the cover, make-cover/reorder/delete in a full-screen viewer (F8, F10).
+- ✅ Thumbnails generated on the phone with the full image (≤ 2000 px + ≤ 480 px JPEGs); the server validates JPEG structure and size and stores both as-is. Lazy-loaded thumbs in the list (F9). See ADR 0001 for why not server-side.
+- ✅ Camera-first new item: photos can be taken before the item is saved and upload on create (F11). Quick add takes one photo.
+- ✅ Storage at `data/photos/<uuid>.jpg` and `.thumb.jpg`; temp-file writes; orphan and temp files swept at startup; immutable cache headers.
+- ⬜ Verify on iPhone: real camera photos, HEIC from the library, speed.
 
 **Done when:** the add-item flow from camera to saved record takes under 30 seconds, and the list scrolls smoothly with a few hundred photos.
 

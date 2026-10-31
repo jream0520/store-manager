@@ -2,11 +2,13 @@ import Fastify from "fastify";
 import fastifyCookie from "@fastify/cookie";
 import fastifyStatic from "@fastify/static";
 import fs from "node:fs";
+import path from "node:path";
 import type Database from "better-sqlite3";
 import { authPlugin, LoginLimiter } from "./auth.js";
 import { categoryRoutes } from "./categories.js";
 import type { Config } from "./config.js";
 import { itemRoutes } from "./items.js";
+import { PhotoStore, photoRoutes } from "./photos.js";
 import { settingsRoutes } from "./settings.js";
 
 export interface AppOptions {
@@ -22,6 +24,10 @@ export function buildApp(config: Config, db: Database.Database, opts: AppOptions
     ajv: { customOptions: { removeAdditional: false } },
   });
 
+  const photos = new PhotoStore(db, path.join(config.dataDir, "photos"));
+  const swept = photos.sweep();
+  if (swept) app.log.info({ swept }, "removed orphaned photo files");
+
   app.register(fastifyCookie);
   app.register(async (api) => {
     // Called directly (not registered) so its guard hook covers every route in this scope.
@@ -35,6 +41,7 @@ export function buildApp(config: Config, db: Database.Database, opts: AppOptions
     await api.register(settingsRoutes(db));
     await api.register(categoryRoutes(db));
     await api.register(itemRoutes(db));
+    await api.register(photoRoutes(db, photos));
   });
 
   if (fs.existsSync(config.webDir)) {

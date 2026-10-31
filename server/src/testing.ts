@@ -1,4 +1,6 @@
 // Test helpers (not part of the runtime build: excluded via tsconfig "exclude").
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildApp, type AppOptions } from "./app.js";
@@ -11,13 +13,14 @@ export const CSRF = { "x-requested-with": "store-manager" };
 
 export function newApp(opts: AppOptions = {}) {
   const db = openDb(":memory:", migrations);
-  const app = buildApp({ port: 0, host: "127.0.0.1", dataDir: "", webDir: "/nonexistent" }, db, opts);
-  return { app, db };
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "sm-test-"));
+  const app = buildApp({ port: 0, host: "127.0.0.1", dataDir, webDir: "/nonexistent" }, db, opts);
+  return { app, db, dataDir };
 }
 
 /** An app with the password set and a signed-in client helper. */
 export async function signedIn(opts: AppOptions = {}) {
-  const { app, db } = newApp(opts);
+  const { app, db, dataDir } = newApp(opts);
   await setPassword(db, PASSWORD);
   const res = await app.inject({ method: "POST", url: "/api/auth/login", headers: CSRF, payload: { password: PASSWORD } });
   const cookie = res.cookies.find((c) => c.name === SESSION_COOKIE)!;
@@ -26,5 +29,5 @@ export async function signedIn(opts: AppOptions = {}) {
   const call = async (method: "GET" | "POST" | "PATCH" | "DELETE", url: string, payload?: object) =>
     app.inject({ method, url, headers, ...(payload ? { payload } : {}) });
 
-  return { app, db, call, headers };
+  return { app, db, dataDir, call, headers };
 }

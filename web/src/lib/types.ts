@@ -15,6 +15,8 @@ export interface Item {
   description: string;
   categoryId: number | null;
   categoryName: string | null;
+  coverPhotoId: string | null;
+  photoCount: number;
   tags: string[];
   costCents: number | null;
   priceCents: number | null;
@@ -36,6 +38,18 @@ export interface Category {
   name: string;
   itemCount: number;
 }
+
+export interface Photo {
+  id: string;
+  itemId: number;
+  width: number;
+  height: number;
+  bytes: number;
+  isCover: boolean;
+  createdAt: string;
+}
+
+export const MAX_PHOTOS_PER_ITEM = 12;
 
 export interface Settings {
   shopName: string;

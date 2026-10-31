@@ -27,16 +27,16 @@ M1 is deliberately early: iOS PWA and camera behavior is the largest risk, so it
 - ✅ Repo structure, test runner, build scripts.
 - ✅ Dockerfile (multi-stage) and `docker-compose.yml` with a volume for `/data`; image verified locally.
 - ✅ Health endpoint, config via environment variables, structured logging.
-- ⬜ Route the host's existing reverse proxy to the container (README snippets) and deploy.
+- ✅ Route the host's existing reverse proxy to the container (served at `/store/`) and deploy via `deploy.ps1`.
 
 **Done when:** `docker compose up` on the host serves the placeholder page at `https://<your-domain>` through the existing proxy.
 
 ## M1 — Device and deploy spike
 **Goal:** Retire the iOS risk.
-- Minimal PWA: manifest, icons, service worker for app shell only.
-- Add to Home Screen on iPhone and iPad; full-screen launch.
-- Camera capture (`<input capture>` or `getUserMedia`) plus library picker; client-side resize and orientation fix (HEIC → JPEG); upload to the server; display it back.
-- Verify behavior after the app is backgrounded and relaunched.
+- ✅ Minimal PWA: manifest, PNG icons (incl. apple-touch-icon), service worker for app shell only.
+- ⬜ Add to Home Screen on iPhone and iPad; full-screen launch. *(needs device test)*
+- ✅ Camera capture (`<input capture>`) plus library picker; client-side resize to 2000 px JPEG with EXIF orientation applied; upload behind a temporary key; display it back. Verified on desktop with an EXIF-rotated fixture. ⬜ iPhone camera and HEIC *(needs device test)*.
+- ⬜ Verify behavior after the app is backgrounded and relaunched (launch counter on the page). *(needs device test)*
 
 **Done when:** a photo taken on the iPhone appears on the server volume and in the app, from the installed Home Screen app.
 

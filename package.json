@@ -3,13 +3,22 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "workspaces": ["server", "web"],
-  "engines": { "node": ">=22" },
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev:server": "npm run dev -w server",
     "dev:web": "npm run dev -w web",
     "build": "npm run build -w web && npm run build -w server",
     "test": "npm test -w server",
-    "typecheck": "npm run typecheck -w server && npm run typecheck -w web"
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
+    "icons": "node scripts/icons.mjs"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.5"
   }
 }

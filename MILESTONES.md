@@ -34,10 +34,10 @@ M1 is deliberately early: iOS PWA and camera behavior is the largest risk, so it
 ## M1 — Device and deploy spike
 **Goal:** Retire the iOS risk.
 - ✅ Minimal PWA: manifest, PNG icons (incl. apple-touch-icon), service worker for app shell only.
-- ✅ Add to Home Screen on iPhone; launches standalone (verified on device 2026-10-31). iPad not yet tried.
+- ✅ Add to Home Screen on iPhone; launches standalone (verified on device 2026-10-31). iPad and a desktop browser confirmed 2026-11-01.
 - ✅ Camera capture (`<input capture>`) plus library picker; client-side resize to 2000 px JPEG with EXIF orientation applied; upload behind a temporary key; display it back. Verified on iPhone and with an EXIF-rotated fixture.
 - ✅ Storage survives background/relaunch (launch counter, verified on device).
-- ⬜ Service worker status on device not yet reported.
+- ✅ Service worker active on device (confirmed 2026-11-01).
 
 **Done when:** a photo taken on the iPhone appears on the server volume and in the app, from the installed Home Screen app.
 
@@ -109,7 +109,8 @@ M1 is deliberately early: iOS PWA and camera behavior is the largest risk, so it
 - ✅ Security: CSP and related headers; sign out everywhere; container runs read-only with no capabilities and no-new-privileges; dependency audit reviewed (see OPERATIONS.md).
 - ✅ Performance with 2,000 items: every API call under 10 ms on the dev machine except the 2-year profit report (31 ms). Expect a few times slower on the server, still well under a second.
 - ✅ Setup and operations docs: docs/OPERATIONS.md.
-- ✅ Real-device regression pass on iPhone after deploy (2026-11-01).
+- ✅ Real-device regression pass after deploy on iPhone, iPad and a desktop browser (2026-11-01). Camera capture not testable in the desktop browser.
+- ✅ Backup and restore confirmed on the real server (2026-11-01).
 - ✅ Tagged v1.0.0.
 
 **Done when:** a fresh host can be restored from a backup into an identical working state, and you are running real inventory on it.

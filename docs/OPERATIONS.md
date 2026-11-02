@@ -1,6 +1,8 @@
 # Store Manager — Operations guide
 
-How to install, update, back up, restore and look after Store Manager. Commands marked **server** run in `~/store-manager` on the host; **dev machine** means the Windows PC with Docker Desktop and this repo.
+How to install, update, back up, restore and look after Store Manager. Commands marked **server** run in the app's folder on the host (`<DEPLOY_DIR>`, usually `~/store-manager`); **dev machine** means the Windows PC with Docker Desktop and this repo.
+
+Values in angle brackets, like `<PUBLIC_URL>`, are this site's own settings. They're kept out of the repo; see [Site settings](#site-settings-siteenv).
 
 ## How it's put together
 
@@ -17,6 +19,23 @@ How to install, update, back up, restore and look after Store Manager. Commands 
 
 - The image is **built on the dev machine** and copied to the server. The server's CPU (Pentium G2020T, no AVX) can't run the front-end build tools; it runs the app fine.
 - The container runs as uid 1000 with a read-only root filesystem, no Linux capabilities and `no-new-privileges`. It can only write to `/data` and a small `/tmp`.
+
+## Site settings (`site.env`)
+
+This deployment's own hostname, addresses and SSH target are **not committed**. They live in `site.env` in the repo folder on the dev machine, which git ignores. `site.env.example` is the committed template listing every key. The docs refer to these values by name in angle brackets, and `deploy.ps1` reads `DEPLOY_TARGET` and `DEPLOY_DIR` from it.
+
+**If `site.env` is missing** (new PC, fresh clone), run `cp site.env.example site.env` and fill it in:
+
+| Key | What it is | Where to find it if forgotten |
+|---|---|---|
+| `DEPLOY_TARGET` | SSH target for the server, `user@host` | How you usually SSH to the server, or `~/.ssh/config` |
+| `DEPLOY_DIR` | Folder on the server with `docker-compose.yml`, `.env`, `data/` | Usually `~/store-manager` |
+| `PUBLIC_URL` | Address you open on the phone, including `/store/` | The Home Screen app's address, or the site block in the server's Caddyfile |
+| `SERVER_LAN_IP` | Server's address on the home network | `APP_BIND` in the server's `.env`, or `hostname -I` on the server |
+| `APP_PORT` | Host port the app is published on | `APP_PORT` in the server's `.env` |
+| `LAN_SUBNET` | Home network range, for the optional LAN-only rule | Router settings, e.g. `192.168.0.0/24` |
+
+These aren't secrets (no passwords or keys), just details of this setup that don't belong in a shared repo. The server's own `.env` (also git-ignored) holds the copies the container actually uses (`APP_BIND`, `APP_PORT`).
 
 ## Configuration (`.env`)
 
@@ -58,10 +77,10 @@ Other proxy setups (nginx, dedicated hostname, Docker network) are in the README
 ## Deploying an update (dev machine, PowerShell)
 
 ```bash
-.\deploy.ps1 -Server <DEPLOY_TARGET>
+.\deploy.ps1
 ```
 
-This builds the image, copies it and `docker-compose.yml` to the server, loads it, restarts the container and runs a health check. Database migrations run automatically when the app starts. Before a big update, take a backup first (Settings → Back up now).
+The server and folder come from `DEPLOY_TARGET` and `DEPLOY_DIR` in `site.env` (or pass `-Server user@host`). This builds the image, copies it and `docker-compose.yml` to the server, loads it, restarts the container and runs a health check. Database migrations run automatically when the app starts. Before a big update, take a backup first (Settings → Back up now).
 
 Never pipe `docker save` through PowerShell; it corrupts the file. `deploy.ps1` writes to a file instead.
 
@@ -81,7 +100,7 @@ The newest `BACKUP_KEEP` (default 14) are kept. Settings → Backups shows the l
 Backups on the same disk don't survive that disk failing. Do at least one of these:
 
 1. **Download now and then.** Settings → Backups → Download latest saves a `.tar.gz` to your phone or computer (Files / iCloud).
-2. **Copy the backups folder off the server** on a schedule, for example to your Nextcloud data or another disk:
+2. **Copy the backups folder off the server** on a schedule, for example to another disk or a synced cloud folder:
    ```bash
    # crontab -e on the server: nightly at 04:00
    0 4 * * * rsync -a --delete ~/store-manager/data/backups/ /mnt/otherdisk/store-manager-backups/
@@ -152,6 +171,7 @@ docker compose up -d
 | Container restarts with "Data directory /data is not writable" | `sudo chown -R 1000:1000 ~/store-manager/data` |
 | Build fails with "Illegal instruction" on the server | Don't build on the server; use `deploy.ps1` from the dev machine. |
 | `invalid tar header` when loading the image | The tar was piped through PowerShell; use `deploy.ps1`. |
+| `deploy.ps1` says "No server given" | `site.env` is missing; see [Site settings](#site-settings-siteenv). |
 | Page loads but is blank, or assets 404 | `BASE_PATH` in the dev machine's `.env` must match the proxy path (`/store/`), then redeploy. |
 | Settings → Backups warns backups may not be running | Check `docker compose logs app \| grep backup`; check disk space (`df -h`). |
 | Camera or Add to Home Screen don't work | The site must be opened over HTTPS. |

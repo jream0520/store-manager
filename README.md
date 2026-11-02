@@ -14,6 +14,8 @@ npm test
 
 ## Deploy and operate
 
+This site's hostname, addresses and SSH target are kept out of the repo in a git-ignored `site.env` (template: `site.env.example`). The docs refer to them as `<PUBLIC_URL>`, `<SERVER_LAN_IP>` and so on. If `site.env` is missing, recreate it from the template; see "Site settings" in the operations guide.
+
 See **[docs/OPERATIONS.md](docs/OPERATIONS.md)** for install, configuration, updates with `deploy.ps1`, backups and restore, passwords, security notes and troubleshooting.
 
 Quick reference (server, in `~/store-manager`):

@@ -23,7 +23,7 @@ It runs as one Docker container on the owner's hosted server and is used from an
 | Financials | Retail price, sold price, sale date, and a single materials-cost total per item, giving profit per item. |
 | Existing data | None to import; the few current items are entered by hand. |
 | Connectivity | Reliable, online-only. No offline mode in v1. |
-| Hosting | The owner's server already runs a TLS reverse proxy (Caddy); the app is served at `<PUBLIC_URL>`. The image is built off-server because the server's CPU can't run the build tools. |
+| Hosting | The owner's server already runs a TLS reverse proxy (Caddy); the app is served under `/store/` on the owner's existing hostname (`<PUBLIC_URL>` in the git-ignored `site.env`). The image is built off-server because the server's CPU can't run the build tools. |
 | Client | PWA on iOS Safari, added to the Home Screen. |
 
 ## 3. Goals and non-goals

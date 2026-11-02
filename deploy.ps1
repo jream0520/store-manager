@@ -1,14 +1,29 @@
 # Builds the image on this machine and loads it on the server.
 # The server's CPU can't run the front-end build tools (no AVX), so it never builds.
 #
-# Usage: .\deploy.ps1 -Server <DEPLOY_TARGET> [-RemoteDir ~/store-manager]
-# BASE_PATH for the build comes from .env here (see .env.example).
+# Usage: .\deploy.ps1 [-Server user@host] [-RemoteDir ~/store-manager]
+# Server and folder default to DEPLOY_TARGET and DEPLOY_DIR in site.env (git-ignored; see
+# site.env.example and docs/OPERATIONS.md). BASE_PATH for the build comes from .env here.
 param(
-    [Parameter(Mandatory = $true)][string]$Server,
-    [string]$RemoteDir = "~/store-manager"
+    [string]$Server,
+    [string]$RemoteDir
 )
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
+
+# Reads KEY=VALUE lines from site.env, ignoring comments and blanks.
+$site = @{}
+if (Test-Path site.env) {
+    foreach ($line in Get-Content site.env) {
+        if ($line -match '^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)\s*$') { $site[$Matches[1]] = $Matches[2] }
+    }
+}
+if (-not $Server) { $Server = $site["DEPLOY_TARGET"] }
+if (-not $RemoteDir) { $RemoteDir = $site["DEPLOY_DIR"] }
+if (-not $RemoteDir) { $RemoteDir = "~/store-manager" }
+if (-not $Server) {
+    throw "No server given. Pass -Server user@host, or copy site.env.example to site.env and set DEPLOY_TARGET."
+}
 
 $tar = Join-Path $env:TEMP "store-manager.tar"
 

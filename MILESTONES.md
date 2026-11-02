@@ -109,8 +109,8 @@ M1 is deliberately early: iOS PWA and camera behavior is the largest risk, so it
 - ✅ Security: CSP and related headers; sign out everywhere; container runs read-only with no capabilities and no-new-privileges; dependency audit reviewed (see OPERATIONS.md).
 - ✅ Performance with 2,000 items: every API call under 10 ms on the dev machine except the 2-year profit report (31 ms). Expect a few times slower on the server, still well under a second.
 - ✅ Setup and operations docs: docs/OPERATIONS.md.
-- ⬜ Real-device regression pass on iPhone (and iPad) after deploy.
-- ⬜ Tag v1.0.
+- ✅ Real-device regression pass on iPhone after deploy (2026-11-01).
+- ✅ Tagged v1.0.0.
 
 **Done when:** a fresh host can be restored from a backup into an identical working state, and you are running real inventory on it.
 
